@@ -1,3 +1,4 @@
+from ctypes import ArgumentError
 from scipy.stats import binom
 import random as rd
 import numpy as np
@@ -22,6 +23,9 @@ class Mutation:
 
     def apply(self, genome: Genome):
         pass
+
+
+
 class PointMutation(Mutation): # DONE
     def __init__(self, rate: float, DEBUG: bool=False) -> None:
         super().__init__(rate, "Point Mutation", DEBUG)
@@ -34,6 +38,8 @@ class PointMutation(Mutation): # DONE
                 print(f"Deleterious starting point...")
             return False
         return True
+
+
 
 class SmallInsertion(Mutation): # DONE
     def __init__(self, rate: float, l_m: int, DEBUG: bool=False) -> None:
@@ -65,9 +71,15 @@ class SmallInsertion(Mutation): # DONE
             
         genome.insert(self.starting_point, self.length)
 
+
+
 class Deletion(Mutation):
-    def __init__(self, rate: float, DEBUG: bool=False) -> None:
-        super().__init__(rate, "Deletion", DEBUG)
+    def __init__(self, rate: float, is_small: bool=False, l_m: int=-1, DEBUG: bool=False) -> None:
+        super().__init__(rate, f"{'Small ' if is_small else ''}Deletion", DEBUG)
+        self.is_small = is_small
+        if self.is_small and l_m == -1:
+            raise ValueError(f"You must provide l_m is is_small is True.")
+        self.l_m = l_m
 
     def is_neutral(self, genome: Genome):
         # We know the proportion of non coding sequences, therefore,
@@ -79,7 +91,10 @@ class Deletion(Mutation):
         
         # We know the maximum length a neutral deletion could have, therefore,
         # we check the length
-        self.length = rd.randint(1, genome.length)
+        if self.is_small:
+            self.length = rd.randint(1, self.l_m)
+        else:
+            self.length = rd.randint(1, genome.length)
 
         # # DEBUG
         # self.length = 5
@@ -134,6 +149,10 @@ class Deletion(Mutation):
         else:
             genome.delete(self.starting_point, self.length)
 
+
+
+
+
 if __name__ == "__main__":
     # np.random.seed(42)
     # rd.seed(42)
@@ -144,7 +163,7 @@ if __name__ == "__main__":
     z_c = 1000 * g
     z_nc = 2000 * g
 
-    genome = Genome(z_c, z_nc, g, DEBUG)
+    genome = Genome(z_c, z_nc, g, DEBUG=DEBUG)
 
     point_mutation_rate = 10e-9
     small_insertion_rate = 10e-9
@@ -153,12 +172,12 @@ if __name__ == "__main__":
     deletion_rate = 10e-9
     inversion_rate = 10e-9
 
-    point_mutation = PointMutation(point_mutation_rate, DEBUG)
+    point_mutation = PointMutation(point_mutation_rate, DEBUG=DEBUG)
 
     if point_mutation.is_neutral(genome):
         point_mutation.apply(genome)
     
-    small_insertion = SmallInsertion(small_insertion_rate, 6, DEBUG)
+    small_insertion = SmallInsertion(small_insertion_rate, 6, DEBUG=DEBUG)
 
     print(genome)
 
@@ -167,13 +186,19 @@ if __name__ == "__main__":
 
     print(genome)
 
-    deletion = Deletion(deletion_rate, DEBUG)
+    deletion = Deletion(deletion_rate, DEBUG=DEBUG)
 
     if deletion.is_neutral(genome):
         deletion.apply(genome)
 
     print(genome)
 
+    small_deletion = Deletion(small_deletion_rate, is_small=True, l_m=6, DEBUG=DEBUG)
+
+    if small_deletion.is_neutral(genome):
+        small_deletion.apply(genome)
+    
+    print(genome)
 
 
     
