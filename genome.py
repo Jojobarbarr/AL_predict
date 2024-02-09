@@ -1,34 +1,45 @@
 import numpy as np
+import numpy.typing as npt
 import random as rd
 
 class Genome:
-    def __init__(self, z_c: int, z_nc: int, g: int, DEBUG: bool=False) -> None:
+    def __init__(self, z_c: int, z_nc: int, g: int, homogeneous: bool=False, DEBUG: bool=False):
+        """
+        Args:
+            z_c (int): number of conding bases.
+            z_nc (int): number of non coding bases.
+            g (int): number of coding segments.
+            homogeneous (bool): if True, non coding sequences are all the same size.
+            DEBUG (bool, optional): Flag to activate prints and explicit genome visualisation. Defaults to False.
+
+        Raises:
+            ValueError: z_c must be a multiple of g.
+        """
         self.z_c = z_c
         self.z_nc = z_nc
         self.length = self.z_c + self.z_nc
         self.g = g
+        self.homogeneous = homogeneous
 
         self.DEBUG = DEBUG
 
         if z_c % g != 0:
-            raise ValueError(f"z_c must be a multiple of g. z_c: {z_c} -- g: {g}")
+            raise ValueError(f"z_c must be a multiple of g.\n" 
+                             f"z_c: {z_c}, g: {g}")
         
         self.gene_length = self.z_c // self.g
         self.nc_proportion = self.z_nc / self.length
         self.max_length_neutral = 0
-        if not self.DEBUG:
-            self.loci = self.init_genome()
-        else:
-            self.g = 3
-            self.gene_length = 2
-            self.z_nc = 16
-            self.z_c = self.g * self.gene_length
-            self.length = self.g * self.gene_length + self.z_nc
-            self.loci, self.genome = self.init_genome()
+        self.loci, self.genome = self.init_genome()
         
         self.update_features()
     
     def __str__(self) -> str:
+        """Print the representation of the genome.
+
+        Returns:
+            str: representation of the genome.
+        """
         if not self.DEBUG:
             return f"\tloci: {self.loci}"
         
@@ -38,44 +49,94 @@ class Genome:
     
     
     def init_genome(self):
+        """Create a random genome respecting the constraints given by the user.
+        """
         if not self.DEBUG:
+            if not self.homogeneous:
+                # To create non homogeneous genome, we start from a non coding genome. 
+                # g random locus of insertion are selected, and the genes are inserted.
+                loci_of_insertion = sorted(rd.sample(range(0, self.z_nc), self.g))
+                loci = np.array([locus + (segment * self.gene_length) + 1 for segment, locus in enumerate(loci_of_insertion)])
+                # orientation = np.array([1 for locus in loci])
+                return loci, np.empty(1)
+            
+            # To create homogeneous genome, promoters are regularly disposed.
+            loci = np.array([promoter * self.gene_length + (self.z_nc / self.g) for promoter in range(self.g)])
+            return loci, np.empty(1)
+
+        ## Only executed in DEBUG mode
+        if not self.homogeneous:
             loci_of_insertion = sorted(rd.sample(range(0, self.z_nc), self.g))
-            loci = np.array([locus + (segment * self.gene_length) + 1 for segment, locus in enumerate(loci_of_insertion)])
-            orientation = np.array([1 for locus in loci])
-            return loci
-
-        # only executed in DEBUG mode
-
-        loci_of_insertion = sorted(rd.sample(range(0, self.z_nc), self.g))
-        loci = np.array([promoter + (segment * self.gene_length) + 1 for segment, promoter in enumerate(loci_of_insertion)])
-        orientation = np.array([1 for locus in loci])
+            loci = np.array([promoter + (segment * self.gene_length) + 1 for segment, promoter in enumerate(loci_of_insertion)])
+            # orientation = np.array([1 for locus in loci])
+        else:
+            loci = np.array([promoter * (self.gene_length + (self.z_nc // self.g)) for promoter in range(self.g)])
+            print(loci)
         genome = self.update_genome(loci)
 
         return loci, genome
     
+    def insertion_binary_search(self, target: int) -> int:
+        """Mapping of target to genome absolute position in insertion case.
+
+        Args:
+            target (int): Position in neutral space.
+
+        Returns:
+            int: next promoter locus index
         """
-        nc_segment_size = self.z_nc // self.g
-        first_promoter_position = 2
-        # genome structure is: first PROMOTER at ORI + first_promoter_position, z_c // g long coding sequence, z_nc_init // g long non-coding sequence
-        genome = np.array([first_promoter_position])
-        genome = np.append(genome, [nc_segment_size for k in range(self.g - 1)])
-        genome = np.append(genome, nc_segment_size - first_promoter_position)
-        
-        # visual_genome length is 90
-        visual_genome = np.array([2, 20, 20, 18])
-        """
-    
-    def binary_search(self, target):
         left, right = 0, len(self.loci) - 1
         while left <= right:
             middle = (left + right) // 2
-            if self.loci[middle] - (middle * self.gene_length) <= target:
+            if self.loci[middle] < target + middle * (self.gene_length - 1):
+                left = middle + 1
+            else:
+                right = middle - 1
+        return left
+
+    def deletion_binary_search(self, target: int) -> int:
+        """Mapping of target to genome absolute position in deletion case.
+
+        Args:
+            target (int): Position in neutral space.
+
+        Returns:
+            int: next promoter locus index
+        """
+        left, right = 0, len(self.loci) - 1
+        while left <= right:
+            middle = (left + right) // 2
+            if self.loci[middle] <= target + middle * self.gene_length:
+                left = middle + 1
+            else:
+                right = middle - 1
+        return left
+
+    def duplication_binary_search(self, target: int) -> int:
+        """Mapping of target to genome absolute position in duplication case.
+
+        Args:
+            target (int): Position in neutral space.
+
+        Returns:
+            int: next promoter locus index
+        """
+        left, right = 0, len(self.loci) - 1
+        while left <= right:
+            middle = (left + right) // 2
+            if self.loci[middle] <= target + middle:
                 left = middle + 1
             else:
                 right = middle - 1
         return left
 
     def insert(self, locus: int, length: int):
+        """Insertion method. Shift all the affected promoters (>= locus) by length.
+
+        Args:
+            locus (int): first promoter affected by the insertion.
+            length (int): length of the insertion.
+        """
         self.z_nc += length
         locus_after_insertion = self.loci >= locus
         self.loci[locus_after_insertion] += length
@@ -85,6 +146,12 @@ class Genome:
 
     
     def delete(self, locus: int, length: int):
+        """Deletion method. Shift all the affected promoters (> locus) by length.
+
+        Args:
+            locus (int): last promoter unaffected by the deletion.
+            length (int): length of the deletion.
+        """
         self.z_nc -= length
         locus_after_deletion = self.loci > locus
         self.loci[locus_after_deletion] -= length
@@ -92,7 +159,10 @@ class Genome:
         if self.DEBUG:
             self.genome = self.update_genome(self.loci)
     
+    
     def parse(self):
+        """Compute some genome characteristics that needs to loop through the genome.
+        """
         self.max_length_neutral = 0
         prev_locus = 0
         for locus in self.loci:
@@ -100,8 +170,13 @@ class Genome:
             if distance > self.max_length_neutral:
                 self.max_length_neutral = distance
             prev_locus = locus
+        distance = self.length - self.loci[-1] - self.gene_length + self.loci[0]
+        if distance > self.max_length_neutral:
+            self.max_length_neutral = distance
 
     def update_features(self):
+        """Compute some genome charasteristics from global attributes.
+        """
         self.length = self.z_c + self.z_nc
         self.nc_proportion = self.z_nc / self.length
         self.parse()
@@ -110,7 +185,15 @@ class Genome:
                   f"New nc_proportion: {self.nc_proportion}\n"
                   f"New max_length_neutral: {self.max_length_neutral}")
 
-    def update_genome(self, loci: np.ndarray):
+    def update_genome(self, loci: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
+        """Update the explicit genome.
+
+        Args:
+            loci (npt.NDArray[np.int_]): array of the absolute position of the promoters.
+
+        Returns:
+            npt.NDArray[np.int_]: explicit genome.
+        """
         genome = np.array([])
         for locus in loci:
             genome = np.append(genome, [0] * (locus - len(genome)))
@@ -129,9 +212,14 @@ if __name__ == "__main__":
     z_c = 1000 * g
     z_nc = 2000 * g
 
+    
+
     genome = Genome(z_c, z_nc, g, DEBUG)
     print(genome)
-    genome.insert(1, 4)
-    print(genome)
-    genome.delete(5, 2)
-    print(genome)
+
+    # print(genome.binary_search(12))
+
+    # genome.insert(1, 4)
+    # print(genome)
+    # genome.delete(5, 2)
+    # print(genome)
