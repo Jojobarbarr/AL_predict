@@ -17,7 +17,7 @@ MUTATIONS = {
 
 def check_sanity(config: configparser.ConfigParser):
     experiment_types = {"mutagenese", "simulation"}
-    experiment_type = config.get("Id", "experiment_type")
+    experiment_type = config.get("Id", "experiment type")
     if experiment_type not in experiment_types:
         raise ValueError(f"Experiment type must be in {experiment_types}. You provided {experiment_type}")
     
@@ -25,10 +25,11 @@ def check_sanity(config: configparser.ConfigParser):
 def mutagenese(config: configparser.ConfigParser):
     genome = Genome(int(config.getfloat("Initial genome", "z_c")), 
                     int(config.getfloat("Initial genome", "z_nc")), 
-                    int(config.getfloat("Initial genome", "g")))
+                    int(config.getfloat("Initial genome", "g")),
+                    config.getboolean("Initial genome", "homogeneous"))
     
-    mutation_types = json.loads(config.get("Mutations", "mutation_type"))
-    experiment_repetitions = int(config.getfloat("Mutagenese", "experiment_repetitions"))
+    mutation_types = json.loads(config.get("Mutations", "mutation type"))
+    experiment_repetitions = int(config.getfloat("Mutagenese", "experiment repetitions"))
     for mutation_type in mutation_types:
         mutation = MUTATIONS[mutation_type](1, genome, int(config.getint("Mutations", "l_m")))
         mutagenese_stat.experiment(mutation, experiment_repetitions)
@@ -44,7 +45,7 @@ if __name__ == "__main__":
     config.read(args.config_file)
 
     check_sanity(config)
-    if config.get("Id", "experiment_type") == "mutagenese":
+    if config.get("Id", "experiment type") == "mutagenese":
         mutagenese(config)
     
 

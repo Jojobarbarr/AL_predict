@@ -113,7 +113,6 @@ class Mutation:
             next_promoter_locus = self.genome.length + self.genome.loci[0]
         else:
             next_promoter_locus = self.genome.loci[next_promoter_locus_index]
-
         if self.length <= next_promoter_locus - self.starting_point:
             return True
         
@@ -180,15 +179,34 @@ class SmallInsertion(Mutation):
 
         self.set_length()
 
-        if self.DEBUG:
-            self.insertion_locus = 4
-            self.length = 3
-        
-            print(f"Neutral", self,
-                  f"\n\tStarting point: {self.insertion_locus}\n"
-                  f"\tLength: {self.length}")
         if not virtually:
             self.genome.insert(self.insertion_locus, self.length)
+    
+    def test(self, insertion_locus_nc_coord: int, answer: int):
+        """Test the implementation.
+
+        Args:
+            insertion_locus_nc_coord (int): Absolute position of the insertion in the neutral space.
+            answer (int): Expected self.insertion_locus value.
+        """
+        print(f"Insertion locus in non coding space: {insertion_locus_nc_coord}")
+
+        self.insertion_locus = insertion_locus_nc_coord        
+        self.map_local_to_absolute_locus(self.genome.insertion_binary_search)
+
+        if answer != self.insertion_locus:
+            raise ValueError(f"Mapping is wrong, it gave {self.insertion_locus} when it was supposed to give {answer}")
+        
+        print(f"Insertion locus after mapping: {self.insertion_locus}")
+
+        self.set_length()
+
+        print(f"Neutral", self,
+              f"\n\tStarting point: {self.insertion_locus}\n"
+              f"\tLength: {self.length}")
+        
+        self.genome.insert(self.insertion_locus, self.length)
+        
 
 
 class Deletion(Mutation):
@@ -199,7 +217,7 @@ class Deletion(Mutation):
             genome (Genome): genome on which the mutation is applied.
             DEBUG (bool, optional): Flag to activate prints. Defaults to False.
         """
-        super().__init__(rate, f"{'Small ' if self.is_small else ''}Deletion", genome, DEBUG)
+        super().__init__(rate, "Deletion", genome, DEBUG)
 
     def length_is_ok(self) -> bool:
         """Checks if length is neutral.
@@ -210,8 +228,6 @@ class Deletion(Mutation):
         if self.length <= self.genome.max_length_neutral:
             return True
         
-        if self.DEBUG:
-            print(f"Deleterious length ({self.length})...")
         return False
     
     def set_starting_point(self) -> int:
@@ -253,13 +269,6 @@ class Deletion(Mutation):
             virtually (bool, optional): If True, mutation isn't applied. Defaults to False.
         """
         super().apply()
-        if self.DEBUG:
-            self.starting_point = 15
-            self.length = 4
-            print(f"Neutral", self,
-                  f"\n\tStarting point: {self.starting_point}\n"
-                  f"\tLength: {self.length}\n")
-            
         if not virtually:
             # If deletion is between the last promoter and the first, we need to proceed with two steps:
             # - Deletion from starting point to ORI
@@ -271,6 +280,53 @@ class Deletion(Mutation):
                 self.genome.delete(0, self.length - end_deletion_length)
             else:
                 self.genome.delete(self.starting_point, self.length)
+    
+    def test(self, starting_point_nc_coord: int, answer: int):
+        """Test the implementation.
+
+        Args:
+            starting_point_nc_coord (int): Absolute position of the starting_point in the neutral space.
+            answer (int): Expected self.starting_point value.
+        """
+        if self.is_small:
+            print("This is a small deletion")
+        print(f"Insertion locus in neutral space: {starting_point_nc_coord}")
+
+        self.length = 3
+
+        self.starting_point = starting_point_nc_coord
+        next_promoter_locus_index = self.genome.deletion_binary_search(self.starting_point)
+        self.starting_point += next_promoter_locus_index * self.genome.gene_length
+
+        
+        # Handle the case when starting point is between last promoter and ORI.
+        if next_promoter_locus_index == len(self.genome.loci):
+            # In circular genome case, first promoter locus is self.genome.loci[0] (mod self.genome.length).
+            next_promoter_locus = self.genome.length + self.genome.loci[0]
+        else:
+            next_promoter_locus = self.genome.loci[next_promoter_locus_index]
+
+        if not (self.length <= next_promoter_locus - self.starting_point):
+            print(f"This mutation is deleterious due to bad ending point")
+            print(self)
+            return None
+
+
+        if answer != self.starting_point:
+            raise ValueError(f"Mapping is wrong, it gave {self.starting_point} when it was supposed to give {answer}")
+        
+        print(f"Starting point locus after mapping: {self.starting_point}")
+
+        print(f"Neutral", self,
+              f"\n\tStarting point: {self.starting_point}\n"
+              f"\tLength: {self.length}")
+        
+        if self.starting_point > self.genome.loci[-1]:
+            end_deletion_length = min(self.genome.length - self.starting_point, self.length)
+            self.genome.delete(self.genome.loci[-1], end_deletion_length)
+            self.genome.delete(0, self.length - end_deletion_length)
+        else:
+            self.genome.delete(self.starting_point, self.length)
 
 
 class SmallDeletion(Deletion):
@@ -282,9 +338,10 @@ class SmallDeletion(Deletion):
             genome (Genome): genome on which the mutation is applied.
             DEBUG (bool, optional): Flag to activate prints. Defaults to False.
         """
-        self.is_small = True
         super().__init__(rate, genome, l_m, DEBUG)
+        self.is_small = True
         self.l_m = l_m
+        self.type = "Small Deletion"
 
 
 class Duplication(Mutation):
@@ -318,9 +375,6 @@ class Duplication(Mutation):
         """
         if self.length <= self.genome.max_length_neutral + self.genome.gene_length - 1:
             return True
-        
-        if self.DEBUG:
-            print(f"Deleterious length ({self.length})...")
         return False
 
     def is_neutral(self) -> bool:
@@ -360,16 +414,60 @@ class Duplication(Mutation):
         self.set_insertion_locus(self.genome.z_nc + self.genome.g - 1)
         self.map_local_to_absolute_locus(self.genome.insertion_binary_search)
 
-        if self.DEBUG:
-            self.starting_point = 1
-            self.length = 5
-            self.insertion_locus = 2
-            print(f"Neutral", self,
-                  f"\n\tStarting point: {self.starting_point}\n"
-                  f"\tLength: {self.length}\n"
-                  f"\tInsertion locus: {self.insertion_locus}")
-        if not virtually:  
+        if not virtually:
             self.genome.insert(self.insertion_locus, self.length)
+    
+    def test(self, starting_point_nc_coord: int, answer1: int, insertion_locus_nc_coord: int, answer2: int):
+        """Test the implementation.
+
+        Args:
+            starting_point_nc_coord (int): Absolute position of the starting point in the neutral space.
+            answer1 (int): Expected self.starting_point value.
+            insertion_locus_nc_coord (int): Absolute position of the insertion in the neutral space.
+            answer1 (int): Expected self.insertion_locus value.
+        """
+        print(f"Starting point locus in neutral space: {starting_point_nc_coord}")
+
+        self.length = 4
+
+        self.starting_point = starting_point_nc_coord
+        next_promoter_locus_index = self.genome.deletion_binary_search(self.starting_point)
+        self.starting_point += next_promoter_locus_index
+
+        print(f"Starting point locus after mapping: {self.starting_point}") 
+
+        # Handle the case when starting point is between last promoter and ORI.
+        if next_promoter_locus_index == len(self.genome.loci):
+            # In circular genome case, first promoter locus is self.genome.loci[0] (mod self.genome.length).
+            next_promoter_locus = self.genome.length + self.genome.loci[0]
+        else:
+            next_promoter_locus = self.genome.loci[next_promoter_locus_index]
+
+        if not (self.length <= next_promoter_locus - self.starting_point - 1):
+            print(f"This mutation is deleterious due to bad ending point")
+            print(self)
+            return None
+
+        
+
+        if answer1 != self.starting_point:
+            raise ValueError(f"Mapping is wrong, it gave {self.starting_point} when it was supposed to give {answer1}")
+        
+        print(f"Insertion locus in neutral space: {insertion_locus_nc_coord}")
+
+        self.insertion_locus = insertion_locus_nc_coord
+        self.map_local_to_absolute_locus(self.genome.insertion_binary_search)
+
+        if answer2 != self.insertion_locus:
+            raise ValueError(f"Mapping is wrong, it gave {self.insertion_locus} when it was supposed to give {answer2}")
+        
+        print(f"Insertion locus after mapping: {self.insertion_locus}")
+        print(f"Neutral", self,
+              f"\n\tStarting point: {self.starting_point}\n"
+              f"\tLength: {self.length}\n"
+              f"\tInsertion locus: {self.insertion_locus}")
+        self.genome.insert(self.insertion_locus, self.length)
+    
         
 """
 class Inversion(Mutation): # TODO don't transpose !!!!
@@ -443,11 +541,7 @@ class Inversion(Mutation): # TODO don't transpose !!!!
 
         genome.inverse(self.starting_point, ending_point, self.insertion_locus)
         """
-
-
-
-if __name__ == "__main__":
-    pass
+    
 
 
 

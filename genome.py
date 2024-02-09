@@ -11,9 +11,6 @@ class Genome:
             g (int): number of coding segments.
             homogeneous (bool): if True, non coding sequences are all the same size.
             DEBUG (bool, optional): Flag to activate prints and explicit genome visualisation. Defaults to False.
-
-        Raises:
-            ValueError: z_c must be a multiple of g.
         """
         self.z_c = z_c
         self.z_nc = z_nc
@@ -22,10 +19,6 @@ class Genome:
         self.homogeneous = homogeneous
 
         self.DEBUG = DEBUG
-
-        if z_c % g != 0:
-            raise ValueError(f"z_c must be a multiple of g.\n" 
-                             f"z_c: {z_c}, g: {g}")
         
         self.gene_length = self.z_c // self.g
         self.nc_proportion = self.z_nc / self.length
@@ -33,7 +26,7 @@ class Genome:
         self.loci, self.genome = self.init_genome()
         
         self.update_features()
-    
+
     def __str__(self) -> str:
         """Print the representation of the genome.
 
@@ -46,7 +39,6 @@ class Genome:
         return (f"\nGenome:\n"
                 f"loci: {self.loci}\n"
                 f"genome: {self.genome}\n")
-    
     
     def init_genome(self):
         """Create a random genome respecting the constraints given by the user.
@@ -61,7 +53,7 @@ class Genome:
                 return loci, np.empty(1)
             
             # To create homogeneous genome, promoters are regularly disposed.
-            loci = np.array([promoter * self.gene_length + (self.z_nc / self.g) for promoter in range(self.g)])
+            loci = np.array([promoter * (self.gene_length + (self.z_nc // self.g)) for promoter in range(self.g)])
             return loci, np.empty(1)
 
         ## Only executed in DEBUG mode
@@ -76,6 +68,29 @@ class Genome:
 
         return loci, genome
     
+    def set_genome(self, z_c: int, z_nc: int, g: int, loci: npt.NDArray[np.int_], genome: npt.NDArray[np.int_]):
+        """Set manually an explicit genome. For DEBUG only.
+
+        Args:
+            z_c (int): number of conding bases.
+            z_nc (int): number of non coding bases.
+            g (int): number of coding segments.
+            loci (npt.NDArray[np.int_]): The implicit genome description (absolute position of promoters).
+            genome (npt.NDArray[np.int_]): The explicit genome description.
+        """
+        self.z_c = z_c
+        self.z_nc = z_nc
+        self.length = self.z_c + self.z_nc
+        self.g = g
+        self.homogeneous = False
+
+        self.DEBUG = True
+        
+        self.gene_length = self.z_c // self.g
+        self.nc_proportion = self.z_nc / self.length
+        self.max_length_neutral = 0
+        self.loci, self.genome = loci, genome
+
     def insertion_binary_search(self, target: int) -> int:
         """Mapping of target to genome absolute position in insertion case.
 
@@ -111,24 +126,25 @@ class Genome:
             else:
                 right = middle - 1
         return left
+    
+    ## NOT USED
+    # def duplication_binary_search(self, target: int) -> int:
+    #     """Mapping of target to genome absolute position in duplication case.
 
-    def duplication_binary_search(self, target: int) -> int:
-        """Mapping of target to genome absolute position in duplication case.
+    #     Args:
+    #         target (int): Position in neutral space.
 
-        Args:
-            target (int): Position in neutral space.
-
-        Returns:
-            int: next promoter locus index
-        """
-        left, right = 0, len(self.loci) - 1
-        while left <= right:
-            middle = (left + right) // 2
-            if self.loci[middle] <= target + middle:
-                left = middle + 1
-            else:
-                right = middle - 1
-        return left
+    #     Returns:
+    #         int: next promoter locus index
+    #     """
+    #     left, right = 0, len(self.loci) - 1
+    #     while left <= right:
+    #         middle = (left + right) // 2
+    #         if self.loci[middle] <= target + middle:
+    #             left = middle + 1
+    #         else:
+    #             right = middle - 1
+    #     return left
 
     def insert(self, locus: int, length: int):
         """Insertion method. Shift all the affected promoters (>= locus) by length.
@@ -194,7 +210,7 @@ class Genome:
         Returns:
             npt.NDArray[np.int_]: explicit genome.
         """
-        genome = np.array([])
+        genome = np.array([], dtype=np.int_)
         for locus in loci:
             genome = np.append(genome, [0] * (locus - len(genome)))
             genome = np.append(genome, [1] * self.gene_length)
