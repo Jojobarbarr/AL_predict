@@ -380,7 +380,7 @@ class Duplication(Mutation):
     def is_neutral(self) -> bool:
         """Checks if mutation is neutral. Duplication is neutral if starting point is not a promoter AND
         length is less than distance to the next promoter AND insertion locus is neutral.
-        This method first checks if starting point is a deleterious locus by conducting a Bernoulli trial with parameter p = len(self.genome.loci) / self.genome.length.
+        This method first checks if starting point is a deleterious locus by conducting a Bernoulli trial with parameter p = 1 - len(self.genome.loci) / self.genome.length.
         Then, checks if insertion locus is neutral by conducting a Bernoulli trial with parameter p = (self.genome.z_nc + self.genome.g) / self.genome.length.
         Then, checks if the length is deleterious.
         Then, checks if the ending point is deleterious.
@@ -389,7 +389,7 @@ class Duplication(Mutation):
             bool: True if mutation is neutral, False if it is deleterious.
         """
         super().is_neutral()
-        if not self.Bernoulli(len(self.genome.loci) / self.genome.length):
+        if not self.Bernoulli(1 - len(self.genome.loci) / self.genome.length):
             return False
         
         if not self.Bernoulli((self.genome.z_nc + self.genome.g) / self.genome.length):

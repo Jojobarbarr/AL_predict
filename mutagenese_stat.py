@@ -1,6 +1,7 @@
 from tqdm import tqdm
 
 import mutations
+import graphics
 
 def experiment(mutation_type: mutations.Mutation, experience_number: int):
     print(f"Experiment on", mutation_type)
