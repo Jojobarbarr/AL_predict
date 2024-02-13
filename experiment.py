@@ -17,37 +17,23 @@ MUTATIONS = {
 class Experiment:
     def __init__(self, config: configparser.ConfigParser):
         self.config = config
-        # Paths section
-        self.home_dir = Path(config.get("Paths", "home directory"))
-        self.save_dir = Path(config.get("Paths", "save directory"))
-        self.checkpoints_dir = Path(config.get("Paths", "checkpoint directory"))
-
-        self.check_sanity()
-
-
-    
-    def check_sanity(self):
-        experiment_types = {"mutagenese", "simulation"}
-        experiment_type = self.config.get("Id", "experiment type")
-        if experiment_type not in experiment_types:
-            raise ValueError(f"Experiment type must be in {experiment_types}. You provided {experiment_type}")
     
     def run(self): 
-        if self.config.get("Id", "experiment type") == "mutagenese":
+        if self.config["Experiment"]["Experiment type"] == "mutagenese":
             self.mutagenese()
 
     def mutagenese(self):
-        genome = Genome(int(self.config.getfloat("Initial genome", "z_c")), 
-                        int(self.config.getfloat("Initial genome", "z_nc")), 
-                        int(self.config.getfloat("Initial genome", "g")),
-                        self.config.getboolean("Initial genome", "homogeneous"))
+        genome = Genome(int(float(self.config["Genome"]["z_c"])), 
+                        int(float(self.config["Genome"]["z_nc"])), 
+                        int(float(self.config["Genome"]["g"])),
+                        self.config["Genome"]["Homogeneous"] == "true")
         
-        mutation_types = json.loads(self.config.get("Mutations", "mutation type"))
-        experiment_repetitions = int(self.config.getfloat("Mutagenese", "experiment repetitions"))
+        mutation_types = self.config["Mutations"]["Mutation types"]
+        experiment_repetitions = int(float(self.config["Mutagenese"]["Iterations"]))
         for mutation_type in mutation_types:
-            mutation = MUTATIONS[mutation_type](1, genome, int(self.config.getint("Mutations", "l_m")))
+            mutation = MUTATIONS[mutation_type](1, genome, int(self.config["Mutations"]["l_m"]))
             
             mutagenese_stat.experiment(mutation, experiment_repetitions)
 
             mutation.stats.compute()
-            graphics.save_stats(self.save_dir, mutation.type, mutation.stats.d_stats)
+            graphics.save_stats(Path(self.config["Paths"]["Save directory"]), mutation.type, mutation.stats.d_stats)

@@ -1,5 +1,5 @@
-import configparser
 import argparse
+import json
 from pathlib import Path
 from experiment import Experiment
 
@@ -8,8 +8,8 @@ if __name__ == "__main__":
     arg_parser.add_argument("config_file", type=Path, help="Configuration file for the experiments, provide absolute path.")
     args = arg_parser.parse_args()
 
-    config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
-    config.read(args.config_file)
+    with open(args.config_file, "r", encoding="utf8") as json_file:
+        config = json.load(json_file)
 
     experiment = Experiment(config)
 
