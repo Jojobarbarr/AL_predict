@@ -36,12 +36,14 @@ class Genome:
         Returns:
             str: representation of the genome.
         """
-        if not self.DEBUG:
-            return f"\tloci: {self.loci}"
-        
         return (f"\nGenome:\n"
-                f"loci: {self.loci}\n"
-                f"genome: {self.genome}\n")
+                f"g: {self.g}\n"
+                f"z_c: {self.z_c}\n"
+                f"z_nc: {self.z_nc}\n"
+                f"length: {self.length}\n"
+                f"homogeneous: {self.homogeneous}\n"
+                f"gene_length: {self.gene_length}\n"
+        )
     
     def init_genome(self):
         """Create a random genome respecting the constraints given by the user.

@@ -86,6 +86,7 @@ class Experiment:
                 elif variable == "z_nc":
                     z_nc = int(float(f"10e{exposant}"))
                 genome = Genome(g, z_c, z_nc, homogeneous, orientation) # type: ignore
+                print(genome)
                 mutations_results = self.run_mutagenese(genome)
                 for mutation in mutations_results:
                     graphics.save_stats(Path(self.config["Paths"]["Save directory"]) / mutation.type, f"{variable}_{exposant}", mutation.stats.d_stats)
