@@ -406,10 +406,36 @@ class Duplication(Mutation):
         Returns:
             bool: If length is deleterious, return False.
         """
-        if self.length <= self.genome.max_length_neutral + self.genome.gene_length - 1:
+        if self.length <= self.genome.max_length_neutral + 2 * (self.genome.gene_length - 1):
             return True
         return False
 
+    def ending_point_is_ok(self, next_promoter_locus_index: int) -> bool:
+        """Checks if ending point is neutral. Ending point is neutral if length is less than distance between next promoter and starting point.
+
+        Args:
+            next_promoter_locus_index (int): next promoter locus index that allows to get next promoter absolute position.
+
+        Returns:
+            bool: Return False if ending point is deleterious.
+        """
+        # Handle the case when starting point is between last promoter and ORI.
+        if next_promoter_locus_index == len(self.genome.loci):
+            # In circular genome case, first promoter locus is self.genome.loci[0] (mod self.genome.length).
+            if self.genome.orientation_list[-1] == -1:
+                next_promoter_locus = self.genome.length + self.genome.loci[0] + self.genome.gene_length - 1
+            else:
+                next_promoter_locus = self.genome.length + self.genome.loci[0]
+        else:
+            if self.genome.orientation_list[next_promoter_locus_index] == -1:
+                next_promoter_locus = self.genome.loci[next_promoter_locus_index] + self.genome.gene_length - 1
+            else:
+                next_promoter_locus = self.genome.loci[next_promoter_locus_index]
+        if self.length <= next_promoter_locus - self.starting_point:
+            return True
+        
+        return False
+    
     def is_neutral(self) -> bool:
         """Checks if mutation is neutral. Duplication is neutral if starting point is not a promoter AND
         length is less than distance to the next promoter AND insertion locus is neutral.
@@ -509,11 +535,44 @@ class Duplication(Mutation):
         return ((self.genome.z_nc + self.genome.g) * (self.genome.length - 1)) / (2 * self.genome.length ** 2)
     
         
-"""
-class Inversion(Mutation): # TODO don't transpose !!!!
-    def __init__(self, rate: float, DEBUG: bool = False) -> None:
-        super().__init__(rate, "Inversion", DEBUG)
+
+class Inversion(Mutation):
+    def __init__(self, rate: float, genome: Genome, l_m: int=-1, DEBUG: bool = False) -> None:
+        """
+        Args:
+            rate (float): rate of occurence.
+            genome (Genome): genome on which the mutation is applied.
+            DEBUG (bool, optional): Flag to activate prints. Defaults to False.
+        """
+        super().__init__(rate, "Inversion", genome, DEBUG)
     
+    def is_neutral(self) -> bool: # TODO discuter du cas où l'inversion concerne un seul gêne et le retourne seulement lui.
+        """Checks if mutation is neutral. Deletion is neutral if the two breakpoints are 
+        in non coding section and different from each other.
+        
+        This method first checks if starting point is a deleterious locus by conducting a Bernoulli trial 
+        with parameter p = self.genome.z_nc +  / self.genome.length.
+        Then, checks if insertion locus is neutral by conducting a Bernoulli trial with parameter p = (self.genome.z_nc + self.genome.g) / self.genome.length.
+        Then, checks if the length is deleterious.
+        Then, checks if the ending point is deleterious.
+
+        Returns:
+            bool: True if mutation is neutral, False if it is deleterious.
+        """
+        super().is_neutral()
+        if not self.Bernoulli((self.genome.z_nc + self.genome.g) / self.genome.length):
+            return False
+        
+        self.set_length()
+
+        if not self.length_is_ok():
+            return False
+    
+        if not self.Bernoulli(1 - self.genome.g / self.genome.length):
+            return False
+        
+        return self.ending_point_is_ok(self.set_starting_point())
+
     def is_neutral(self, genome: Genome):
         if rd.random() > genome.nc_proportion:
             if self.DEBUG:

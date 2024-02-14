@@ -19,13 +19,14 @@ class Genome:
         self.length = self.z_c + self.z_nc
         self.g = g
         self.homogeneous = homogeneous
+        self.orientation = orientation
 
         self.DEBUG = DEBUG
         
         self.gene_length = self.z_c // self.g
         self.nc_proportion = self.z_nc / self.length
         self.max_length_neutral = 0
-        self.loci, self.genome = self.init_genome()
+        self.loci, self.orientation_list, self.genome = self.init_genome()
         
         self.update_features()
         print("Genome initialisation done.")
@@ -54,8 +55,11 @@ class Genome:
                 # g random locus of insertion are selected, and the genes are inserted.
                 loci_of_insertion = sorted(rd.sample(range(0, self.z_nc), self.g))
                 loci = np.array([locus + (segment * self.gene_length) + 1 for segment, locus in enumerate(loci_of_insertion)])
-                # orientation = np.array([1 for locus in loci])
-                return loci, np.empty(1)
+                if self.orientation:
+                    orientation = np.array([1 for locus in loci])
+                else:
+                    orientation = np.array([rd.choice([1, -1]) for locus in loci])
+                return loci, orientation, np.empty(1)
             
             # To create homogeneous genome, promoters are regularly disposed.
             loci = np.array([promoter * (self.gene_length + (self.z_nc // self.g)) for promoter in range(self.g)])
@@ -65,13 +69,16 @@ class Genome:
         if not self.homogeneous:
             loci_of_insertion = sorted(rd.sample(range(0, self.z_nc), self.g))
             loci = np.array([promoter + (segment * self.gene_length) + 1 for segment, promoter in enumerate(loci_of_insertion)])
-            # orientation = np.array([1 for locus in loci])
+            if self.orientation:
+                orientation = np.array([1 for locus in loci])
+            else:
+                orientation = np.array([rd.choice([1, -1]) for locus in loci])
         else:
             loci = np.array([promoter * (self.gene_length + (self.z_nc // self.g)) for promoter in range(self.g)])
             print(loci)
         genome = self.update_genome(loci)
 
-        return loci, genome
+        return loci, orientation, genome
     
     def set_genome(self, z_c: int, z_nc: int, g: int, loci: npt.NDArray[np.int_], genome: npt.NDArray[np.int_]):
         """Set manually an explicit genome. For DEBUG only.
