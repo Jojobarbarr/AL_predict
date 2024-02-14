@@ -3,15 +3,17 @@ import numpy.typing as npt
 import random as rd
 
 class Genome:
-    def __init__(self, z_c: int, z_nc: int, g: int, homogeneous: bool=False, DEBUG: bool=False):
+    def __init__(self, g: int, z_c: int, z_nc: int, homogeneous: bool=False, orientation: bool=False, DEBUG: bool=False):
         """
         Args:
+            g (int): number of coding segments.
             z_c (int): number of conding bases.
             z_nc (int): number of non coding bases.
-            g (int): number of coding segments.
             homogeneous (bool): if True, non coding sequences are all the same size.
+            orientation (bool): if True, every genes are in the same direction.
             DEBUG (bool, optional): Flag to activate prints and explicit genome visualisation. Defaults to False.
         """
+        print("Genome initialisation...")
         self.z_c = z_c
         self.z_nc = z_nc
         self.length = self.z_c + self.z_nc
@@ -26,6 +28,7 @@ class Genome:
         self.loci, self.genome = self.init_genome()
         
         self.update_features()
+        print("Genome initialisation done.")
 
     def __str__(self) -> str:
         """Print the representation of the genome.
@@ -122,6 +125,24 @@ class Genome:
         while left <= right:
             middle = (left + right) // 2
             if self.loci[middle] <= target + middle * self.gene_length:
+                left = middle + 1
+            else:
+                right = middle - 1
+        return left
+    
+    def duplication_binary_search(self, target: int) -> int:
+        """Mapping of target to genome absolute position in deletion case.
+
+        Args:
+            target (int): Position in neutral space.
+
+        Returns:
+            int: next promoter locus index
+        """
+        left, right = 0, len(self.loci) - 1
+        while left <= right:
+            middle = (left + right) // 2
+            if self.loci[middle] <= target + middle:
                 left = middle + 1
             else:
                 right = middle - 1

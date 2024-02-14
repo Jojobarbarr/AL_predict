@@ -120,6 +120,17 @@ def test_duplications():
     duplication.test(0, 0, 0, 1) 
     print(genome)
 
+    explicit_genome = np.array([0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0,])
+    implicit_genome = np.array([1, 8, 14])
+
+    genome = Genome(1, 1, 1)
+    genome.set_genome(12, 7, 3, np.copy(implicit_genome), np.copy(explicit_genome))
+    duplication = mutations.Duplication(1, genome, 3, DEBUG=True)
+
+    print(f"{'*' * 16}\nTEST 4")
+    print(genome)
+    duplication.test(6, 7, 8, 14) 
+    print(genome)
 if __name__ == "__main__":
     # test_small_insertions()
     # test_small_deletions()

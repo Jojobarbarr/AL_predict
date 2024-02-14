@@ -49,6 +49,7 @@ class Mutation:
         """
         self.stats.neutral_count += 1
         self.stats.length_sum += self.length
+        self.stats.length_square_sum += self.length ** 2
 
     def Bernoulli(self, p: float) -> bool:
         """Perform a Bernoulli trial with parameter p, 0 <= p <= 1.
@@ -140,6 +141,14 @@ class PointMutation(Mutation):
         """
         super().is_neutral()
         return self.Bernoulli(self.genome.nc_proportion)
+    
+    def theory(self) -> float:
+        """Returns the theoretical mutation neutrality probability from the mathematical model.
+
+        Returns:
+            float: mutation neutrality probability
+        """
+        return self.genome.z_nc / self.genome.length
 
 
 
@@ -206,6 +215,14 @@ class SmallInsertion(Mutation):
               f"\tLength: {self.length}")
         
         self.genome.insert(self.insertion_locus, self.length)
+
+    def theory(self) -> float:
+        """Returns the theoretical mutation neutrality probability from the mathematical model.
+
+        Returns:
+            float: mutation neutrality probability
+        """
+        return (self.genome.z_nc + self.genome.g) / self.genome.length
         
 
 
@@ -327,6 +344,14 @@ class Deletion(Mutation):
             self.genome.delete(0, self.length - end_deletion_length)
         else:
             self.genome.delete(self.starting_point, self.length)
+        
+    def theory(self) -> float:
+        """Returns the theoretical mutation neutrality probability from the mathematical model.
+
+        Returns:
+            float: mutation neutrality probability
+        """
+        return self.genome.z_nc * (self.genome.z_nc / self.genome.g + 1) / (2 * self.genome.length ** 2)
 
 
 class SmallDeletion(Deletion):
@@ -342,6 +367,14 @@ class SmallDeletion(Deletion):
         self.is_small = True
         self.l_m = l_m
         self.type = "Small Deletion"
+    
+    def theory(self) -> float:
+        """Returns the theoretical mutation neutrality probability from the mathematical model.
+
+        Returns:
+            float: mutation neutrality probability
+        """
+        return (self.genome.z_nc - (self.l_m - 1) / 2) / self.genome.length
 
 
 class Duplication(Mutation):
@@ -361,8 +394,8 @@ class Duplication(Mutation):
         Returns:
             int: the index of the next promoter locus.
         """
-        self.starting_point = rd.randint(0, self.genome.length - len(self.genome.loci) - 1)
-        next_promoter_locus_index = self.genome.deletion_binary_search(self.starting_point)
+        self.starting_point = rd.randint(0, self.genome.length - self.genome.g - 1)
+        next_promoter_locus_index = self.genome.duplication_binary_search(self.starting_point)
         self.starting_point += next_promoter_locus_index
         return next_promoter_locus_index
 
@@ -389,15 +422,15 @@ class Duplication(Mutation):
             bool: True if mutation is neutral, False if it is deleterious.
         """
         super().is_neutral()
-        if not self.Bernoulli(1 - len(self.genome.loci) / self.genome.length):
-            return False
-        
         if not self.Bernoulli((self.genome.z_nc + self.genome.g) / self.genome.length):
             return False
         
         self.set_length()
 
         if not self.length_is_ok():
+            return False
+    
+        if not self.Bernoulli(1 - self.genome.g / self.genome.length):
             return False
         
         return self.ending_point_is_ok(self.set_starting_point())
@@ -431,7 +464,7 @@ class Duplication(Mutation):
         self.length = 4
 
         self.starting_point = starting_point_nc_coord
-        next_promoter_locus_index = self.genome.deletion_binary_search(self.starting_point)
+        next_promoter_locus_index = self.genome.duplication_binary_search(self.starting_point)
         self.starting_point += next_promoter_locus_index
 
         print(f"Starting point locus after mapping: {self.starting_point}") 
@@ -442,8 +475,7 @@ class Duplication(Mutation):
             next_promoter_locus = self.genome.length + self.genome.loci[0]
         else:
             next_promoter_locus = self.genome.loci[next_promoter_locus_index]
-
-        if not (self.length <= next_promoter_locus - self.starting_point - 1):
+        if not (self.length <= next_promoter_locus - self.starting_point):
             print(f"This mutation is deleterious due to bad ending point")
             print(self)
             return None
@@ -467,6 +499,14 @@ class Duplication(Mutation):
               f"\tLength: {self.length}\n"
               f"\tInsertion locus: {self.insertion_locus}")
         self.genome.insert(self.insertion_locus, self.length)
+    
+    def theory(self) -> float:
+        """Returns the theoretical mutation neutrality probability from the mathematical model.
+
+        Returns:
+            float: mutation neutrality probability
+        """
+        return ((self.genome.z_nc + self.genome.g) * (self.genome.length - 1)) / (2 * self.genome.length ** 2)
     
         
 """

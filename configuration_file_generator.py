@@ -112,33 +112,61 @@ class ConfigGenerator(QWidget):
         genome_layout.addWidget(self.g_label, 0, 0)
         self.g_edit = QLineEdit()
         self.g_edit.setText("1e3")
-        genome_layout.addWidget(self.g_edit, 0, 1)
+        genome_layout.addWidget(self.g_edit, 0, 1, 1, 2)
+
+        # AUTO_Z_C
+        self.auto_z_c_checkbox = QCheckBox()
+        self.auto_z_c_checkbox.setText("Keep z_c to: ")
+        self.auto_z_c_checkbox.stateChanged.connect(self.auto_z_c_change)
+        genome_layout.addWidget(self.auto_z_c_checkbox, 1, 0)
+
+        self.z_c_factor_edit = QLineEdit()
+        self.z_c_factor_edit.setText("1000")
+        self.z_c_factor_edit.setEnabled(False)
+        genome_layout.addWidget(self.z_c_factor_edit, 1, 1)
+
+        self.z_c_factor_label = QLabel("g")
+        genome_layout.addWidget(self.z_c_factor_label, 1, 2)
+        
+        # AUTO_Z_NC
+        self.auto_z_nc_checkbox = QCheckBox()
+        self.auto_z_nc_checkbox.setText("Keep z_nc to: ")
+        self.auto_z_nc_checkbox.stateChanged.connect(self.auto_z_nc_change)
+        genome_layout.addWidget(self.auto_z_nc_checkbox, 2, 0)
+
+        self.z_nc_factor_edit = QLineEdit()
+        self.z_nc_factor_edit.setText("1000")
+        self.z_nc_factor_edit.setEnabled(False)
+        genome_layout.addWidget(self.z_nc_factor_edit, 2, 1)
+
+        self.z_nc_factor_label = QLabel("g")
+        genome_layout.addWidget(self.z_nc_factor_label, 2, 2)
 
         # Z_C
         self.z_c_label = QLabel('z_c: ')
-        genome_layout.addWidget(self.z_c_label, 1, 0)
+        genome_layout.addWidget(self.z_c_label, 3, 0)
         self.z_c_edit = QLineEdit()
         self.z_c_edit.setText("1e6")
-        genome_layout.addWidget(self.z_c_edit, 1, 1)
+        genome_layout.addWidget(self.z_c_edit, 3, 1, 1, 2)
 
         # Z_NC
         self.z_nc_label = QLabel('z_nc: ')
-        genome_layout.addWidget(self.z_nc_label, 2, 0)
+        genome_layout.addWidget(self.z_nc_label, 4, 0)
         self.z_nc_edit = QLineEdit()
         self.z_nc_edit.setText("1e6")
-        genome_layout.addWidget(self.z_nc_edit, 2, 1)
+        genome_layout.addWidget(self.z_nc_edit, 4, 1, 1, 2)
 
         # HOMOGENEOUS
         self.homogeneous_checkbox = QCheckBox()
         self.homogeneous_checkbox.setText("Enable homogeneous genome")
-        genome_layout.addWidget(self.homogeneous_checkbox, 3, 0)
+        genome_layout.addWidget(self.homogeneous_checkbox, 5, 0)
 
         # ORIENTATION
         self.orientation_checkbox = QCheckBox()
         self.orientation_checkbox.setText("Enable one way genome")
-        genome_layout.addWidget(self.orientation_checkbox)
+        genome_layout.addWidget(self.orientation_checkbox, 5, 1)
 
-        self.main_layout.addWidget(self.genome_groupbox, 1, 1)
+        self.main_layout.addWidget(self.genome_groupbox, 1, 1, 1, 2)
 
 
 
@@ -207,7 +235,7 @@ class ConfigGenerator(QWidget):
         mutagenese_layout.addWidget(self.iterations_edit, 0, 1)
 
         # VARIABLE
-        self.variable_label = QLabel("Variable")
+        self.variable_label = QLabel("Variable: ")
         mutagenese_layout.addWidget(self.variable_label, 1, 0)
         self.variable_combo = QComboBox()
         self.variable_combo.addItems(["No variable", "g", "z_c", "z_nc"])
@@ -229,7 +257,7 @@ class ConfigGenerator(QWidget):
         self.range_max_edit.setText('1e6')
         range_layout.addWidget(self.range_max_edit, 0, 3)
 
-        self.range_step_label = QLabel("\tPower step (can be float): ")
+        self.range_step_label = QLabel("\tPower step: ")
         range_layout.addWidget(self.range_step_label, 0, 4)
         self.range_step_edit = QLineEdit()
         self.range_step_edit.setText('1')
@@ -270,7 +298,23 @@ class ConfigGenerator(QWidget):
             self.range_widget.setEnabled(True)
         else:
             self.range_widget.setEnabled(False)
-
+    
+    def auto_z_c_change(self, state):
+        if state == QtCore.Qt.Checked:
+            self.z_c_edit.setEnabled(False)
+            self.z_c_factor_edit.setEnabled(True)
+        else:
+            self.z_c_edit.setEnabled(True)
+            self.z_c_factor_edit.setEnabled(False)
+    
+    def auto_z_nc_change(self, state):
+        if state == QtCore.Qt.Checked:
+            self.z_nc_edit.setEnabled(False)
+            self.z_nc_factor_edit.setEnabled(True)
+        else:
+            self.z_nc_edit.setEnabled(True)
+            self.z_nc_factor_edit.setEnabled(False)
+    
     def handle_experiment_change(self):
         experiment_type = self.experiment_type_combo.currentText()
         experiment_name = self.experiment_name_edit.text()
@@ -286,6 +330,10 @@ class ConfigGenerator(QWidget):
                 self.mutagenese_groupbox.setEnabled(False)
             if self.variable_combo.currentText() == "No variable":
                 self.range_widget.setEnabled(False)
+            if not self.auto_z_c_checkbox.isChecked:
+                self.z_c_factor_edit.setEnabled(False)
+            if not self.auto_z_nc_checkbox.isChecked:
+                self.z_nc_factor_edit.setEnabled(False)
         else:
             for index in range(self.main_layout.count()):
                 item = self.main_layout.itemAt(index)
@@ -298,7 +346,7 @@ class ConfigGenerator(QWidget):
         ## EXPERIMENT
         d_params["Experiment"] = {
             "Experiment name": self.experiment_name_edit.text(),
-            "Expermient type": self.experiment_type_combo.currentText(),
+            "Experiment type": self.experiment_type_combo.currentText(),
         }
         
 
@@ -325,10 +373,15 @@ class ConfigGenerator(QWidget):
         }
 
         ## GENOME ##
+        g = self.g_edit.text()
         d_params["Genome"] = {
-            "g": self.g_edit.text(),
+            "g": g,
             "z_c": self.z_c_edit.text(),
+            "z_c_auto": self.auto_z_c_checkbox.isChecked(),
+            "z_c_factor": self.z_c_factor_edit.text(),
             "z_nc": self.z_nc_edit.text(),
+            "z_nc_auto": self.auto_z_nc_checkbox.isChecked(),
+            "z_nc_factor": self.z_nc_factor_edit.text(),
             "Homogeneous": self.homogeneous_checkbox.isChecked(),
             "Orientation": self.orientation_checkbox.isChecked(),
         }
@@ -347,6 +400,10 @@ class ConfigGenerator(QWidget):
         ## MUTAGENESE ##
         d_params["Mutagenese"] = {
             "Iterations": self.iterations_edit.text(),
+            "Variable": self.variable_combo.currentText(),
+            "From": self.range_min_edit.text(),
+            "To": self.range_max_edit.text(),
+            "Step": self.range_step_edit.text(),
         }
 
         ## SAVE FILE ##
