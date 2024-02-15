@@ -8,6 +8,12 @@ class Statistics:
             return 0
         return sum / population
     
+    def mean_estimator_variance(self, variance: float, number_of_samples: int) -> float:
+        if number_of_samples == 0:
+            print("Empty or one individual sample.")
+            return 0
+        return (variance / number_of_samples) ** 0.5
+    
     def variance(self, square_sum: int | float, population: int | float, mean: float) -> float:
         if population <= 1:
             print("Empty or one individual population.")
@@ -27,17 +33,20 @@ class MutationStatistics(Statistics):
     
     def compute(self, theory: float=0):
         neutral_mean = self.neutral_mean()
-        neutral_std = self.neutral_variance(neutral_mean) 
+        neutral_std = self.neutral_variance(neutral_mean)
+        neutral_mean_std = self.mean_estimator_variance(neutral_std, self.count)
         lenght_mean = self.length_mean()
         length_std = self.length_variance(lenght_mean)
+        length_mean_std = self.mean_estimator_variance(length_std, self.neutral_count)
         self.d_stats = {
             "Total mutations": self.count,
             "Neutral mutations": self.neutral_count,
             "Neutral mutations proportion": neutral_mean,
-            "Neutral mutations standard deviation": neutral_std,
+            "Neutral mutations standard deviation of proportion estimator": neutral_mean_std,
             "Neutral probability theory": theory,
             "Length mean": lenght_mean,
-            "Length standard deviation": length_std,
+            "Length standard deviation of mean estimator": length_mean_std,
+            "Length standard deviation": length_std ** 0.5,
         }
 
     def neutral_mean(self) -> float:

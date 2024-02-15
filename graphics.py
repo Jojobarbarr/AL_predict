@@ -19,6 +19,7 @@ def plot_and_save_mutagenese(x_value: list[float], y_value: list[float], y_std: 
         plt.xlabel(variable)
         plt.xscale("log")
         plt.ylabel(f"{name}")
-        plt.ylim(ylimits)
+        # plt.ylim(ylimits)
+        plt.yscale("log")
         plt.legend()
         plt.savefig(save_path / f"{name.lower().replace(' ', '_')}_{variable}.jpg")

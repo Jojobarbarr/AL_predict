@@ -24,6 +24,7 @@ YLIMITS_LENGTH = {
         "Small Deletion": (0, 10),
         "Deletion": (0, 500),
         "Duplication": (0, 800),
+        "Inversion": (0, 800),
     },
 }
 
@@ -33,7 +34,7 @@ YLIMITS_NEAUTRALITY = {
         "Small Insertion": (0, 0.6),
         "Small Deletion": (0, 0.6),
         "Deletion": (0, 0.015),
-        "Duplication": (0, 0.002),
+        "Duplication": (0, 0.03),
     },
 }
 
@@ -134,12 +135,10 @@ class Experiment:
                     d_stats = json.load(json_file)
 
                 neutral_proportions.append(d_stats["Neutral mutations proportion"])
-                neutral_stds.append(d_stats["Neutral mutations standard deviation"])
+                neutral_stds.append(d_stats["Neutral mutations standard deviation of proportion estimator"])
                 theoretical_proportions.append(d_stats["Neutral probability theory"])
                 length_means.append(d_stats["Length mean"])
-                length_stds.append(d_stats["Length standard deviation"])
-
-
+                length_stds.append(d_stats["Length standard deviation of mean estimator"])
             graphics.plot_and_save_mutagenese(x_value, neutral_proportions, neutral_stds, save_path / mutation.type, f"Neutral {mutation.type} proportion", 
                                               variable, YLIMITS_NEAUTRALITY[variable][mutation.type], theoretical_proportions)
             graphics.plot_and_save_mutagenese(x_value, length_means, neutral_stds, save_path / mutation.type, f"{mutation.type.capitalize()} length mean", 
