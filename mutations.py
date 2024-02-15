@@ -532,7 +532,7 @@ class Duplication(Mutation):
         Returns:
             float: mutation neutrality probability
         """
-        return ((self.genome.z_nc + self.genome.g) * (self.genome.length - 1)) / (2 * self.genome.length ** 2)
+        return ((self.genome.z_nc + self.genome.g) * ((self.genome.z_c + self.genome.z_nc) / self.genome.g - 1)) / (2 * self.genome.length ** 2)
     
         
 
@@ -546,101 +546,108 @@ class Inversion(Mutation):
         """
         super().__init__(rate, "Inversion", genome, DEBUG)
     
-    def is_neutral(self) -> bool: # TODO discuter du cas où l'inversion concerne un seul gêne et le retourne seulement lui.
+    def set_breaking_locus(self):
+        switched = False
+        breaking_locus = rd.sample(range(0, self.genome.z_nc + self.genome.g), 2)
+        if breaking_locus[1] < breaking_locus[0]:
+            breaking_locus[0], breaking_locus[1] = breaking_locus[0], breaking_locus[1]
+            switched = True
+        next_promoter_locus_index_starting_point = self.genome.insertion_binary_search(breaking_locus[0])
+        next_promoter_locus_index_ending_point = self.genome.insertion_binary_search(breaking_locus[1])
+
+        self.starting_point = breaking_locus[0] + (self.genome.gene_length - 1) * (next_promoter_locus_index_starting_point - 1)
+        ending_point = breaking_locus[1] + (self.genome.gene_length - 1) * (next_promoter_locus_index_ending_point - 1)
+        self.length = ending_point - self.starting_point
+        if switched:
+            self.length = self.genome.length - self.length
+    
+
+
+
+    def is_neutral(self) -> bool:
         """Checks if mutation is neutral. Deletion is neutral if the two breakpoints are 
         in non coding section and different from each other.
         
-        This method first checks if starting point is a deleterious locus by conducting a Bernoulli trial 
-        with parameter p = self.genome.z_nc +  / self.genome.length.
-        Then, checks if insertion locus is neutral by conducting a Bernoulli trial with parameter p = (self.genome.z_nc + self.genome.g) / self.genome.length.
-        Then, checks if the length is deleterious.
-        Then, checks if the ending point is deleterious.
+        This method first checks if starting point is neutral by conducting a Bernoulli trial 
+        with parameter p = (self.genome.z_nc + self.genome.g) / self.genome.length.
+        Then, checks if the ending point is neutral and different from the starting point by 
+        conducting a Bernoulli trial with parameter p = (self.genome.z_nc + self.genome.g - 1) / self.genome.length).
 
         Returns:
             bool: True if mutation is neutral, False if it is deleterious.
         """
         super().is_neutral()
-        if not self.Bernoulli((self.genome.z_nc + self.genome.g) / self.genome.length):
+        if not self.Bernoulli((self.genome.z_nc + self.genome.g) / self.genome.length) and self.DEBUG:
             return False
-        
-        self.set_length()
+        return self.Bernoulli((self.genome.z_nc + self.genome.g - 1) / (self.genome.length - 1)) or self.DEBUG
 
-        if not self.length_is_ok():
-            return False
     
-        if not self.Bernoulli(1 - self.genome.g / self.genome.length):
-            return False
-        
-        return self.ending_point_is_ok(self.set_starting_point())
+    def apply(self, virtually: bool=False):
+        """Applies the mutation. If virtually is True, all the mutation characteristics are determined but it is not applied on the genome.
 
-    def is_neutral(self, genome: Genome):
-        if rd.random() > genome.nc_proportion:
-            if self.DEBUG:
-                print(f"Deleterious starting point...")
-            return False
-        if rd.random() > (genome.z_nc - 1) / genome.length:
-            if self.DEBUG:
-                print(f"Deleterious ending point...")
-            return False
-        if rd.random() > (genome.z_nc + genome.g) / genome.length:
-            if self.DEBUG:
-                print(f"Deleterious insertion locus...")
-            return False
-        return True
-    
-    def apply(self, genome: Genome):
-        # To get random but different starting and ending point, we draw a random
-        # number that represent the absolute position in non coding genome.
-        # We check the following promoter, and get the absolute position in whole genome that is:
-        # absolute_position_in_non_coding + promoter_numbers_passed * gene_length
-        breakpoints = rd.sample(range(genome.z_nc), 2)
-
-        # DEBUG
-        breakpoints = [0, 2]
-        # /DEBUG
-
-        # Ensure starting point is before ending point
-        if breakpoints[0] > breakpoints[1]:
-            breakpoints[0], breakpoints[1] = breakpoints[1], breakpoints[0]
-            
-        next_promoter_locus_index_record = []
-        for index, breakpoint in enumerate(breakpoints):
-            next_promoter_locus_index_record.append(genome.deletion_binary_search(breakpoint))
-            breakpoints[index] += next_promoter_locus_index_record[-1] * genome.gene_length
-
-        self.starting_point, ending_point = breakpoints
-        self.length = ending_point - self.starting_point
-
-        print(self.starting_point, self.length, breakpoints)
-        # If the inversion is on the same sequence of non coding genome, the structure is unchanged
-        if next_promoter_locus_index_record[0] == next_promoter_locus_index_record[1]:
-            return None
-        if next_promoter_locus_index_record[0] == 0 and next_promoter_locus_index_record[1] == len(genome.loci):
-            return None
-        
-
-        # We know this mutation is neutral.
-        # There are z_nc + g positions for a neutral insertion.
-        # Once the position in non coding genome is known, the binary 
-        # search gives the minimum index of promoters affected.
-        # TODO
-        self.insertion_locus = rd.randint(0, genome.z_nc + genome.g - self.length - 1) # both end points are included with rd.randint
-        
-        # DEBUG
-        self.insertion_locus = 10
-        # /DEBUG
-
-        self.insertion_locus = genome.loci[genome.inversion_binary_search(self.insertion_locus, self.starting_point, ending_point)]
-
-        if self.DEBUG:
-            print(f"Neutral", self,
-                  f"\n\tStarting point of inversion: {self.starting_point}\n"
-                  f"\tLength: {self.length}\n"
-                  f"\tInsertion locus: {self.insertion_locus}")
-
-        genome.inverse(self.starting_point, ending_point, self.insertion_locus)
+        Args:
+            virtually (bool, optional): If True, mutation isn't applied. Defaults to False.
         """
+        self.set_breaking_locus()
+        super().apply()
+        
+        if not virtually:
+            self.genome.inverse(self.starting_point, self.length)
     
+    def test(self, starting_point_nc_coord: int, answer1: int, ending_point_nc_coord: int, answer2: int):
+        """Test the implementation.
+
+        Args:
+            starting_point_nc_coord (int): Absolute position of the starting point in the neutral space.
+            answer1 (int): Expected self.starting_point value.
+            ending_point_nc_coord (int): Absolute position of the ending point in the neutral space.
+            answer1 (int): Expected ending_point value.
+        """
+        print(f"Starting point locus in neutral space: {starting_point_nc_coord}")
+
+        switched = False
+        breaking_locus = [starting_point_nc_coord, ending_point_nc_coord]
+        if breaking_locus[1] < breaking_locus[0]:
+            breaking_locus[0], breaking_locus[1] = breaking_locus[0], breaking_locus[1]
+            switched = True
+        next_promoter_locus_index_starting_point = self.genome.insertion_binary_search(breaking_locus[0])
+        next_promoter_locus_index_ending_point = self.genome.insertion_binary_search(breaking_locus[1])
+
+        self.starting_point = breaking_locus[0] + (self.genome.gene_length - 1) * (next_promoter_locus_index_starting_point - 1)
+        ending_point = breaking_locus[1] + (self.genome.gene_length - 1) * (next_promoter_locus_index_ending_point - 1)
+        self.length = ending_point - self.starting_point
+        if switched:
+            self.length = self.genome.length - self.length
+
+        if answer1 != self.starting_point:
+            raise ValueError(f"Mapping is wrong, it gave {self.starting_point} when it was supposed to give {answer1}")
+        
+        print(f"Starting point locus after mapping: {self.starting_point}")
+
+        print(f"Ending point locus in neutral space: {ending_point_nc_coord}")
+
+        ending_point = ending_point_nc_coord
+        next_promoter_locus_index_ending_point = self.genome.insertion_binary_search(ending_point)
+        ending_point += (self.genome.gene_length - 1) * (next_promoter_locus_index_ending_point - 1)
+
+        if answer2 != ending_point - self.starting_point:
+            raise ValueError(f"Mapping is wrong, it gave {ending_point - self.starting_point} when it was supposed to give {answer2}")
+        
+        print(f"Ending point locus after mapping: {ending_point}")
+
+        print(f"Neutral", self,
+              f"\n\tStarting point: {self.starting_point}\n"
+              f"\tLength: {ending_point - self.starting_point}")
+        
+        self.genome.inverse(self.starting_point, ending_point - self.starting_point)
+    
+    def theory(self) -> float:
+        """Returns the theoretical mutation neutrality probability from the mathematical model.
+
+        Returns:
+            float: mutation neutrality probability
+        """
+        return ((self.genome.z_nc + self.genome.g) * (self.genome.z_nc + self.genome.g - 1)) / (self.genome.length * (self.genome.length - 1))
 
 
 

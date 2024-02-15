@@ -49,30 +49,26 @@ class Genome:
     def init_genome(self):
         """Create a random genome respecting the constraints given by the user.
         """
+        if self.orientation:
+            orientation = np.array([1 for _ in range(self.g)])
+        else:
+            orientation = np.array([rd.choice([1, -1]) for _ in range(self.g)])
         if not self.DEBUG:
             if not self.homogeneous:
                 # To create non homogeneous genome, we start from a non coding genome. 
                 # g random locus of insertion are selected, and the genes are inserted.
                 loci_of_insertion = sorted(rd.sample(range(0, self.z_nc), self.g))
                 loci = np.array([locus + (segment * self.gene_length) + 1 for segment, locus in enumerate(loci_of_insertion)])
-                if self.orientation:
-                    orientation = np.array([1 for locus in loci])
-                else:
-                    orientation = np.array([rd.choice([1, -1]) for locus in loci])
                 return loci, orientation, np.empty(1)
             
             # To create homogeneous genome, promoters are regularly disposed.
             loci = np.array([promoter * (self.gene_length + (self.z_nc // self.g)) for promoter in range(self.g)])
-            return loci, np.empty(1)
+            return loci, orientation, np.empty(1)
 
         ## Only executed in DEBUG mode
         if not self.homogeneous:
             loci_of_insertion = sorted(rd.sample(range(0, self.z_nc), self.g))
             loci = np.array([promoter + (segment * self.gene_length) + 1 for segment, promoter in enumerate(loci_of_insertion)])
-            if self.orientation:
-                orientation = np.array([1 for locus in loci])
-            else:
-                orientation = np.array([rd.choice([1, -1]) for locus in loci])
         else:
             loci = np.array([promoter * (self.gene_length + (self.z_nc // self.g)) for promoter in range(self.g)])
             print(loci)
@@ -80,7 +76,7 @@ class Genome:
 
         return loci, orientation, genome
     
-    def set_genome(self, z_c: int, z_nc: int, g: int, loci: npt.NDArray[np.int_], genome: npt.NDArray[np.int_]):
+    def set_genome(self, z_c: int, z_nc: int, g: int, loci: npt.NDArray[np.int_], genome: npt.NDArray[np.int_], orientation: npt.NDArray[np.int_]=np.array([])):
         """Set manually an explicit genome. For DEBUG only.
 
         Args:
@@ -89,19 +85,22 @@ class Genome:
             g (int): number of coding segments.
             loci (npt.NDArray[np.int_]): The implicit genome description (absolute position of promoters).
             genome (npt.NDArray[np.int_]): The explicit genome description.
+            orientation (npt.NDArray[np.int_], optional): The orientation of the genes. Defaults to np.array([]).
         """
         self.z_c = z_c
         self.z_nc = z_nc
         self.length = self.z_c + self.z_nc
         self.g = g
         self.homogeneous = False
+        if orientation.size == 0:
+            orientation = np.array([1 for _ in range(self.g)])
 
         self.DEBUG = True
         
         self.gene_length = self.z_c // self.g
         self.nc_proportion = self.z_nc / self.length
         self.max_length_neutral = 0
-        self.loci, self.genome = loci, genome
+        self.loci, self.orientation_list, self.genome = loci, orientation, genome
 
     def insertion_binary_search(self, target: int) -> int:
         """Mapping of target to genome absolute position in insertion case.
@@ -140,7 +139,7 @@ class Genome:
         return left
     
     def duplication_binary_search(self, target: int) -> int:
-        """Mapping of target to genome absolute position in deletion case.
+        """Mapping of target to genome absolute position in duplication case.
 
         Args:
             target (int): Position in neutral space.
@@ -156,25 +155,6 @@ class Genome:
             else:
                 right = middle - 1
         return left
-    
-    ## NOT USED
-    # def duplication_binary_search(self, target: int) -> int:
-    #     """Mapping of target to genome absolute position in duplication case.
-
-    #     Args:
-    #         target (int): Position in neutral space.
-
-    #     Returns:
-    #         int: next promoter locus index
-    #     """
-    #     left, right = 0, len(self.loci) - 1
-    #     while left <= right:
-    #         middle = (left + right) // 2
-    #         if self.loci[middle] <= target + middle:
-    #             left = middle + 1
-    #         else:
-    #             right = middle - 1
-    #     return left
 
     def insert(self, locus: int, length: int):
         """Insertion method. Shift all the affected promoters (>= locus) by length.
@@ -186,6 +166,21 @@ class Genome:
         self.z_nc += length
         locus_after_insertion = self.loci >= locus
         self.loci[locus_after_insertion] += length
+        self.update_features()
+        if self.DEBUG:
+            self.genome = self.update_genome(self.loci)
+    
+    def inverse(self, locus: int, length: int):
+        """Inverse method. Reverse the sequence between locus and locus + length.
+
+        Args:
+            locus (int): first promoter affected by the inversion.
+            length (int): length of the inversion.
+        """
+        end_locus = locus + length
+        locus_affected = np.logical_and(self.loci >= locus, self.loci < end_locus)
+        self.loci[locus_affected] = end_locus - (self.loci[locus_affected] - locus) - 1
+        self.orientation_list[locus_affected] = -self.orientation_list[locus_affected][::-1]
         self.update_features()
         if self.DEBUG:
             self.genome = self.update_genome(self.loci)

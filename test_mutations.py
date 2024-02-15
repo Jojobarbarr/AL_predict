@@ -131,6 +131,45 @@ def test_duplications():
     print(genome)
     duplication.test(6, 7, 8, 14) 
     print(genome)
+
+    def test_inversions():
+        explicit_genome = np.array([0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0])
+        implicit_genome = np.array([1, 5, 10, 13, 17])
+        orientation = np.array([1, -1, -1, 1, 1])
+
+        genome = Genome(1, 1, 1)
+        genome.set_genome(4, 5, 2, np.copy(implicit_genome), np.copy(explicit_genome), np.copy(orientation))
+
+        inversion = mutations.Inversion(1, genome, 3, DEBUG=True)
+
+        print(f"{'*' * 16}\nTEST 1")
+        print(genome)
+        inversion.test(1, 2, 2, 5)
+        print(genome)
+
+        genome.set_genome(4, 6, 2, np.copy(implicit_genome), np.copy(explicit_genome))
+        print(f"{'*' * 16}\nTEST 2")
+        print(genome)
+        inversion.test(4, 6, 4, 5)
+        print(genome)
+
+        genome.set_genome(4, 6, 2, np.copy(implicit_genome), np.copy(explicit_genome))
+        print(f"{'*' * 16}\nTEST 3")
+        print(genome)
+        inversion.test(0, 0, 0, 1) 
+        print(genome)
+
+        explicit_genome = np.array([0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0,])
+        implicit_genome = np.array([1, 8, 14])
+
+        genome = Genome(1, 1, 1)
+        genome.set_genome(12, 7, 3, np.copy(implicit_genome), np.copy(explicit_genome))
+        inversion = mutations.Inversion(1, genome, 3, DEBUG=True)
+
+        print(f"{'*' * 16}\nTEST 4")
+        print(genome)
+        inversion.test(6, 7, 8, 14) 
+        print(genome)
 if __name__ == "__main__":
     # test_small_insertions()
     # test_small_deletions()

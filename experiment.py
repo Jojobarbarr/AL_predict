@@ -14,15 +14,26 @@ MUTATIONS = {
     "Small deletion": mutations.SmallDeletion,
     "Deletion": mutations.Deletion,
     "Duplication": mutations.Duplication,
+    "Inversion": mutations.Inversion,
 }
 
-YLIMITS = {
+YLIMITS_LENGTH = {
     "g": {
         "Point Mutation": (0, 1),
         "Small Insertion": (0, 1),
         "Small Deletion": (0, 10),
         "Deletion": (0, 500),
         "Duplication": (0, 800),
+    },
+}
+
+YLIMITS_NEAUTRALITY = {
+    "g": {
+        "Point Mutation": (0, 0.6),
+        "Small Insertion": (0, 0.6),
+        "Small Deletion": (0, 0.6),
+        "Deletion": (0, 0.015),
+        "Duplication": (0, 0.002),
     },
 }
 
@@ -74,17 +85,17 @@ class Experiment:
                                   int(self.config["Mutagenese"]["Step"])):
                 
                 if variable == "g":
-                    g = int(float(f"10e{exposant}"))
+                    g = int(float(f"1e{exposant}"))
                     if self.config["Genome"]["z_c_auto"]:
                         z_c = z_c_factor * g
                     if self.config["Genome"]["z_nc_auto"]:
                         z_nc = z_nc_factor * g
 
                 elif variable == "z_c":
-                    z_c = int(float(f"10e{exposant}"))
+                    z_c = int(float(f"1e{exposant}"))
 
                 elif variable == "z_nc":
-                    z_nc = int(float(f"10e{exposant}"))
+                    z_nc = int(float(f"1e{exposant}"))
                 genome = Genome(g, z_c, z_nc, homogeneous, orientation) # type: ignore
                 print(genome)
                 mutations_results = self.run_mutagenese(genome)
@@ -129,7 +140,7 @@ class Experiment:
                 length_stds.append(d_stats["Length standard deviation"])
 
 
-            graphics.plot_and_save_mutagenese(x_value, neutral_proportions, save_path / mutation.type, f"Neutral {mutation.type} proportion", 
-                                              variable, (0, 1), theoretical_proportions)
-            graphics.plot_and_save_mutagenese(x_value, length_means, save_path / mutation.type, f"{mutation.type.capitalize()} length mean", 
-                                              variable, YLIMITS[variable][mutation.type])
+            graphics.plot_and_save_mutagenese(x_value, neutral_proportions, neutral_stds, save_path / mutation.type, f"Neutral {mutation.type} proportion", 
+                                              variable, YLIMITS_NEAUTRALITY[variable][mutation.type], theoretical_proportions)
+            graphics.plot_and_save_mutagenese(x_value, length_means, neutral_stds, save_path / mutation.type, f"{mutation.type.capitalize()} length mean", 
+                                              variable, YLIMITS_LENGTH[variable][mutation.type])

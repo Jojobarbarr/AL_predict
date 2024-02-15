@@ -27,9 +27,9 @@ class MutationStatistics(Statistics):
     
     def compute(self, theory: float=0):
         neutral_mean = self.neutral_mean()
-        neutral_std = self.neutral_variance(neutral_mean) ** (1/2)
+        neutral_std = self.neutral_variance(neutral_mean) 
         lenght_mean = self.length_mean()
-        length_std = self.length_variance(lenght_mean) ** (1/2)
+        length_std = self.length_variance(lenght_mean)
         self.d_stats = {
             "Total mutations": self.count,
             "Neutral mutations": self.neutral_count,
