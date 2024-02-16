@@ -376,7 +376,7 @@ class SmallDeletion(Deletion):
         Returns:
             float: mutation neutrality probability
         """
-        return ((self.genome.z_nc - (self.l_m - 1) / 2) / self.genome.length,
+        return ((self.genome.z_nc - self.genome.g * (self.l_m - 1) / 2) / self.genome.length,
                 (1 + self.l_m) / 2)
 
 
