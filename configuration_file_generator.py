@@ -34,7 +34,7 @@ class ConfigGenerator(QWidget):
         self.experiment_type_label = QLabel('Experiment type: ')
         experiment_layout.addWidget(self.experiment_type_label, 1, 0)
         self.experiment_type_combo = QComboBox()
-        self.experiment_type_combo.addItems(["", "Mutagenese", "Simulation"])
+        self.experiment_type_combo.addItems(["Mutagenese", "Simulation"])
         experiment_layout.addWidget(self.experiment_type_combo, 1, 1)
         self.experiment_type_combo.currentIndexChanged.connect(self.handle_experiment_change)
 
@@ -319,7 +319,7 @@ class ConfigGenerator(QWidget):
         experiment_type = self.experiment_type_combo.currentText()
         experiment_name = self.experiment_name_edit.text()
 
-        if experiment_type != "" and experiment_name != "":
+        if experiment_name != "":
             for index in range(self.main_layout.count()):
                 item = self.main_layout.itemAt(index)
                 if isinstance(item.widget(), QWidget):
@@ -407,13 +407,14 @@ class ConfigGenerator(QWidget):
         }
 
         ## SAVE FILE ##
-        directory_path = Path(QFileDialog.getExistingDirectory(self, "Select Directory"))
-        if directory_path:
-            with open(directory_path / f"{self.experiment_name_edit.text()}.json", "w", encoding="utf8") as f:
+        options = QFileDialog.Options()
+        save_file, _ = QFileDialog.getSaveFileName(self, "Save file", "", "JSON files (*.json)", options=options)
+        if save_file:
+            with open(f"{save_file}.json", "w", encoding="utf8") as f:
                 json.dump(d_params, f, indent=2)
 
-        self.info_box("The configuration file was successfully generated at:\n"
-                      f"{directory_path / self.experiment_name_edit.text()}.json")
+                self.info_box("The configuration file was successfully generated at:\n"
+                             f"{save_file}.json")
 
     def open_directory_dialog(self, param):
         directory_path = QFileDialog.getExistingDirectory(self, "Select Directory")

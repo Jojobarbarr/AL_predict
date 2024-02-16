@@ -35,12 +35,14 @@ YLIMITS_NEAUTRALITY = {
         "Small Deletion": (0, 0.6),
         "Deletion": (0, 0.015),
         "Duplication": (0, 0.03),
+        "Inversion": (0, 0.03)
     },
 }
 
 class Experiment:
     def __init__(self, config: configparser.ConfigParser):
         self.config = config
+        self.save_path = Path(config["Paths"]["Save directory"]) / config["Experiment"]["Experiment name"]
     
     def run(self, only_plot: bool=False):
         if self.config["Experiment"]["Experiment type"] == "Mutagenese":
@@ -101,17 +103,15 @@ class Experiment:
                 print(genome)
                 mutations_results = self.run_mutagenese(genome)
                 for mutation in mutations_results:
-                    graphics.save_stats(Path(self.config["Paths"]["Save directory"]) / mutation.type, f"{variable}_{exposant}", mutation.stats.d_stats)
+                    graphics.save_stats(self.save_path / mutation.type, f"{variable}_{exposant}", mutation.stats.d_stats)
         else:
             genome = Genome(g, z_c, z_nc, homogeneous, orientation) # type: ignore
             mutations_results = self.run_mutagenese(genome)
             for mutation in mutations_results:
-                graphics.save_stats(Path(self.config["Paths"]["Save directory"]) / mutation.type, "control", mutation.stats.d_stats)
+                graphics.save_stats(self.save_path / mutation.type, "control", mutation.stats.d_stats)
     
     def magnify_mutagenese(self):
-        save_path = Path(self.config["Paths"]["Save directory"])
         variable = self.config["Mutagenese"]["Variable"]
-
 
         power_min = int(m.log10(float(self.config["Mutagenese"]["From"])))
         power_max = int(m.log10(float(self.config["Mutagenese"]["To"])))
@@ -131,7 +131,7 @@ class Experiment:
             
             for value in range(power_min, power_max + 1, power_step):
 
-                with open(save_path / mutation.type / f"{variable}_{value}.json", "r", encoding="utf8") as json_file:
+                with open(self.save_path / mutation.type / f"{variable}_{value}.json", "r", encoding="utf8") as json_file:
                     d_stats = json.load(json_file)
 
                 neutral_proportions.append(d_stats["Neutral mutations proportion"])
@@ -139,7 +139,7 @@ class Experiment:
                 theoretical_proportions.append(d_stats["Neutral probability theory"])
                 length_means.append(d_stats["Length mean"])
                 length_stds.append(d_stats["Length standard deviation of mean estimator"])
-            graphics.plot_and_save_mutagenese(x_value, neutral_proportions, neutral_stds, save_path / mutation.type, f"Neutral {mutation.type} proportion", 
+            graphics.plot_and_save_mutagenese(x_value, neutral_proportions, neutral_stds, self.save_path / mutation.type, f"Neutral {mutation.type} proportion", 
                                               variable, YLIMITS_NEAUTRALITY[variable][mutation.type], theoretical_proportions)
-            graphics.plot_and_save_mutagenese(x_value, length_means, neutral_stds, save_path / mutation.type, f"{mutation.type.capitalize()} length mean", 
+            graphics.plot_and_save_mutagenese(x_value, length_means, length_stds, self.save_path / mutation.type, f"{mutation.type.capitalize()} length mean", 
                                               variable, YLIMITS_LENGTH[variable][mutation.type])

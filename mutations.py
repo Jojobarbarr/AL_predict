@@ -118,6 +118,7 @@ class Mutation:
             return True
         
         return False
+    
 
 
 
@@ -148,7 +149,7 @@ class PointMutation(Mutation):
         Returns:
             float: mutation neutrality probability
         """
-        return self.genome.z_nc / self.genome.length
+        return (self.genome.z_nc / self.genome.length, 0)
 
 
 
@@ -222,7 +223,7 @@ class SmallInsertion(Mutation):
         Returns:
             float: mutation neutrality probability
         """
-        return (self.genome.z_nc + self.genome.g) / self.genome.length
+        return ((self.genome.z_nc + self.genome.g) / self.genome.length, (1 + self.l_m) / 2)
         
 
 
@@ -351,7 +352,8 @@ class Deletion(Mutation):
         Returns:
             float: mutation neutrality probability
         """
-        return self.genome.z_nc * (self.genome.z_nc / self.genome.g + 1) / (2 * self.genome.length ** 2)
+        return (self.genome.z_nc * (self.genome.z_nc / self.genome.g + 1) / (2 * self.genome.length ** 2),
+                self.genome.z_nc / (3 * self.genome.g))
 
 
 class SmallDeletion(Deletion):
@@ -374,7 +376,8 @@ class SmallDeletion(Deletion):
         Returns:
             float: mutation neutrality probability
         """
-        return (self.genome.z_nc - (self.l_m - 1) / 2) / self.genome.length
+        return ((self.genome.z_nc - (self.l_m - 1) / 2) / self.genome.length,
+                (1 + self.l_m) / 2)
 
 
 class Duplication(Mutation):
@@ -532,7 +535,8 @@ class Duplication(Mutation):
         Returns:
             float: mutation neutrality probability
         """
-        return ((self.genome.z_nc + self.genome.g) * ((self.genome.z_c + self.genome.z_nc) / self.genome.g - 1)) / (2 * self.genome.length ** 2)
+        return (((self.genome.z_nc + self.genome.g) * ((self.genome.z_c + self.genome.z_nc) / self.genome.g - 1)) / (2 * self.genome.length ** 2),
+                (self.genome.z_c + self.genome.z_nc) / (3 * self.genome.g))
     
         
 
@@ -647,7 +651,8 @@ class Inversion(Mutation):
         Returns:
             float: mutation neutrality probability
         """
-        return ((self.genome.z_nc + self.genome.g) * (self.genome.z_nc + self.genome.g - 1)) / (self.genome.length * (self.genome.length - 1))
+        return (((self.genome.z_nc + self.genome.g) * (self.genome.z_nc + self.genome.g - 1)) / (self.genome.length * (self.genome.length - 1)),
+                0)
 
 
 
