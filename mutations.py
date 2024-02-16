@@ -143,7 +143,7 @@ class PointMutation(Mutation):
         super().is_neutral()
         return self.Bernoulli(self.genome.nc_proportion)
     
-    def theory(self) -> float:
+    def theory(self) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
 
         Returns:
@@ -217,11 +217,11 @@ class SmallInsertion(Mutation):
         
         self.genome.insert(self.insertion_locus, self.length)
 
-    def theory(self) -> float:
+    def theory(self) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
 
         Returns:
-            float: mutation neutrality probability
+            tuple[float, float]: mutation neutrality probability
         """
         return ((self.genome.z_nc + self.genome.g) / self.genome.length, (1 + self.l_m) / 2)
         
@@ -346,11 +346,11 @@ class Deletion(Mutation):
         else:
             self.genome.delete(self.starting_point, self.length)
         
-    def theory(self) -> float:
+    def theory(self) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
 
         Returns:
-            float: mutation neutrality probability
+            tuple[float, float]: mutation neutrality probability and length mean to expect
         """
         return (self.genome.z_nc * (self.genome.z_nc / self.genome.g + 1) / (2 * self.genome.length ** 2),
                 self.genome.z_nc / (3 * self.genome.g))
@@ -370,7 +370,7 @@ class SmallDeletion(Deletion):
         self.l_m = l_m
         self.type = "Small Deletion"
     
-    def theory(self) -> float:
+    def theory(self) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
 
         Returns:
@@ -529,7 +529,7 @@ class Duplication(Mutation):
               f"\tInsertion locus: {self.insertion_locus}")
         self.genome.insert(self.insertion_locus, self.length)
     
-    def theory(self) -> float:
+    def theory(self) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
 
         Returns:
@@ -581,7 +581,7 @@ class Inversion(Mutation):
             bool: True if mutation is neutral, False if it is deleterious.
         """
         super().is_neutral()
-        if not self.Bernoulli((self.genome.z_nc + self.genome.g) / self.genome.length) and self.DEBUG:
+        if not self.Bernoulli((self.genome.z_nc + self.genome.g) / self.genome.length) and not self.DEBUG:
             return False
         return self.Bernoulli((self.genome.z_nc + self.genome.g - 1) / (self.genome.length - 1)) or self.DEBUG
 
@@ -645,7 +645,7 @@ class Inversion(Mutation):
         
         self.genome.inverse(self.starting_point, ending_point - self.starting_point)
     
-    def theory(self) -> float:
+    def theory(self) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
 
         Returns:

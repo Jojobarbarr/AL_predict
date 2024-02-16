@@ -1,4 +1,6 @@
 .vscode/
+.ipynb_checkpoints
+configurations/
 __pycache__/
 bin/
 lib/
