@@ -1,6 +1,8 @@
+import random as rd
+
 import numpy as np
 import numpy.typing as npt
-import random as rd
+
 
 class Genome:
     def __init__(self, g: int, z_c: int, z_nc: int, homogeneous: bool=False, orientation: bool=False, DEBUG: bool=False):
@@ -14,6 +16,9 @@ class Genome:
             DEBUG (bool, optional): Flag to activate prints and explicit genome visualisation. Defaults to False.
         """
         print("Genome initialisation...")
+        if g == 1 and z_c == 1 and z_nc == 1:
+            # Dummy genome, no calculation will be done on it.
+            return None
         self.z_c = z_c
         self.z_nc = z_nc
         self.length = self.z_c + self.z_nc

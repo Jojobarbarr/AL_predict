@@ -3,6 +3,7 @@ import numpy as np
 import mutations
 from genome import Genome
 
+
 def test_small_insertions():
     explicit_genome = np.array([0, 1, 1, 0, 0, 0, 1, 1, 0, 0])
     implicit_genome = np.array([1, 6])

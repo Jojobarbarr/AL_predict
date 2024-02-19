@@ -1,14 +1,19 @@
-import matplotlib.pyplot as plt
-from pathlib import Path
 import json
+from pathlib import Path
 
-def save_stats(save_dir: Path, name: str, d_stats: dict):
-    save_dir.mkdir(parents=True, exist_ok=True)
-    with open(save_dir / f"{name}.json", "w", encoding="utf8") as json_file:
-        json.dump(d_stats, json_file, indent=2)
+import matplotlib.pyplot as plt
 
-def plot_and_save_mutagenese(x_value: list[float], y_value: list[float], y_std: list[float], save_path: Path, name: str, 
-                             variable: str, ylimits: tuple[float | int, float | int], theoreticals: list[float]=[]):
+
+def save_stats(save_dir: Path, results: dict[str, dict]) -> None:
+    for mutation, result_by_pow in results.items():
+        save_dir_specific = save_dir / mutation
+        save_dir_specific.mkdir(parents=True, exist_ok=True)
+        for power, d_stats in result_by_pow.items():
+            with open(save_dir_specific / f"{power}.json", "w", encoding="utf8") as json_file:
+                json.dump(d_stats, json_file, indent=2)
+
+def plot_mutagenese(x_value: list[float], y_value: list[float], y_std: list[float], save_path: Path, name: str, 
+                    variable: str, ylimits: tuple[float | int, float | int], theoreticals: list[float]=[]):
         
         plt.clf()
         plt.plot(x_value, y_value, marker='o', label="Estimation")

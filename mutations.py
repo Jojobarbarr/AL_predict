@@ -1,12 +1,12 @@
 import random as rd
 from typing import Callable
 
-from stats import MutationStatistics
 from genome import Genome
+from stats import MutationStatistics
 
 
 class Mutation:
-    def __init__(self, rate: float, type: str, genome: Genome, DEBUG: bool=False) -> None:
+    def __init__(self, rate: float, type: str, genome: Genome | None=None, DEBUG: bool=False) -> None:
         """
 
         Args:
@@ -17,7 +17,10 @@ class Mutation:
         """
         self.rate = rate
         self.type = type
-        self.genome = genome
+        if genome is not None:
+            self.genome = genome
+        else:
+            self.genome = Genome(1, 1, 1) # Dummy genome
         self.stats = MutationStatistics()
         self.DEBUG = DEBUG
 
@@ -123,7 +126,7 @@ class Mutation:
 
 
 class PointMutation(Mutation):
-    def __init__(self, rate: float, genome: Genome, l_m: int=-1, DEBUG: bool=False) -> None:
+    def __init__(self, rate: float, genome: Genome | None=None, l_m: int=-1, DEBUG: bool=False) -> None:
         """
 
         Args:
@@ -154,7 +157,7 @@ class PointMutation(Mutation):
 
 
 class SmallInsertion(Mutation):
-    def __init__(self, rate: float, genome: Genome, l_m: int, DEBUG: bool=False) -> None:
+    def __init__(self, rate: float, genome: Genome | None=None, l_m: int=10, DEBUG: bool=False) -> None:
         """
         Args:
             rate (float): rate of occurence.
@@ -223,12 +226,13 @@ class SmallInsertion(Mutation):
         Returns:
             tuple[float, float]: mutation neutrality probability
         """
-        return ((self.genome.z_nc + self.genome.g) / self.genome.length, (1 + self.l_m) / 2)
+        return ((self.genome.z_nc + self.genome.g) / self.genome.length,
+                (1 + self.l_m) / 2)
         
 
 
 class Deletion(Mutation):
-    def __init__(self, rate: float, genome: Genome, l_m: int=-1, DEBUG: bool=False) -> None:
+    def __init__(self, rate: float, genome: Genome | None=None, l_m: int=-1, DEBUG: bool=False) -> None:
         """
         Args:
             rate (float): rate of occurence.
@@ -357,7 +361,7 @@ class Deletion(Mutation):
 
 
 class SmallDeletion(Deletion):
-    def __init__(self, rate: float, genome: Genome, l_m: int, DEBUG: bool = False) -> None:
+    def __init__(self, rate: float, genome: Genome | None=None, l_m: int=10, DEBUG: bool = False) -> None:
         """
         Args:
             rate (float): rate of occurence.
@@ -377,11 +381,10 @@ class SmallDeletion(Deletion):
             float: mutation neutrality probability
         """
         return ((self.genome.z_nc - self.genome.g * (self.l_m - 1) / 2) / self.genome.length,
-                (1 + self.l_m) / 2)
-
+                ((self.genome.z_nc / self.genome.g) * (self.l_m + 1) / 2 + (1 - self.l_m ** 2) / 3) / (self.genome.z_nc / self.genome.g - (self.l_m - 1) / 2))
 
 class Duplication(Mutation):
-    def __init__(self, rate: float, genome: Genome, l_m: int=-1, DEBUG: bool = False) -> None:
+    def __init__(self, rate: float, genome: Genome | None=None, l_m: int=-1, DEBUG: bool = False) -> None:
         """
         Args:
             rate (float): rate of occurence.
@@ -541,7 +544,7 @@ class Duplication(Mutation):
         
 
 class Inversion(Mutation):
-    def __init__(self, rate: float, genome: Genome, l_m: int=-1, DEBUG: bool = False) -> None:
+    def __init__(self, rate: float, genome: Genome | None=None, l_m: int=-1, DEBUG: bool = False) -> None:
         """
         Args:
             rate (float): rate of occurence.
@@ -652,7 +655,7 @@ class Inversion(Mutation):
             float: mutation neutrality probability
         """
         return (((self.genome.z_nc + self.genome.g) * (self.genome.z_nc + self.genome.g - 1)) / (self.genome.length * (self.genome.length - 1)),
-                0)
+                self.genome.length)
 
 
 

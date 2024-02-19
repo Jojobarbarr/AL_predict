@@ -1,0 +1,11 @@
+{
+  "Total mutations": 1000000,
+  "Neutral mutations": 27,
+  "Neutral mutations proportion": 2.7e-05,
+  "Neutral mutations standard deviation of proportion estimator": 5.196084872288654e-06,
+  "Neutral probability theory": 2.50124875e-05,
+  "Length mean": 617.1481481481482,
+  "Length standard deviation of mean estimator": 86.0969211702726,
+  "Length mean theory": 666.6666666666666,
+  "Length standard deviation": 447.37272552649387
+}

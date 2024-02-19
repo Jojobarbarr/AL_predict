@@ -1,12 +1,15 @@
 import configparser
-import math as m
-from genome import Genome
-import mutations
-import matplotlib.pyplot as plt
 import json
+import math as m
+import random as rd
 from pathlib import Path
-import mutagenese_stat
+
+import numpy as np
+from tqdm import tqdm
+
 import graphics
+import mutations
+from genome import Genome
 
 MUTATIONS = {
     "Point mutation": mutations.PointMutation,
@@ -19,9 +22,9 @@ MUTATIONS = {
 
 YLIMITS_LENGTH = {
     "g": {
-        "Point Mutation": (0, 1),
-        "Small Insertion": (0, 1),
-        "Small Deletion": (0, 10),
+        "Point mutation": (0, 1),
+        "Small insertion": (0, 1),
+        "Small deletion": (0, 10),
         "Deletion": (0, 500),
         "Duplication": (0, 800),
         "Inversion": (0, 800),
@@ -30,9 +33,9 @@ YLIMITS_LENGTH = {
 
 YLIMITS_NEAUTRALITY = {
     "g": {
-        "Point Mutation": (0, 0.6),
-        "Small Insertion": (0, 0.6),
-        "Small Deletion": (0, 0.6),
+        "Point mutation": (0, 0.6),
+        "Small insertion": (0, 0.6),
+        "Small deletion": (0, 0.6),
         "Deletion": (0, 0.015),
         "Duplication": (0, 0.03),
         "Inversion": (0, 0.03)
@@ -41,87 +44,109 @@ YLIMITS_NEAUTRALITY = {
 
 class Experiment:
     def __init__(self, config: configparser.ConfigParser):
-        self.config = config
-        self.save_path = Path(config["Paths"]["Save directory"]) / config["Experiment"]["Experiment name"]
+        self.experiment_config = config["Experiment"]
+        self.mutations_config = config["Mutations"]
+        self.genome_config = config["Genome"]
+        self.mutation_rates_config = config["Mutation rates"]
+        self.mutagenese_config = config["Mutagenese"]
+        # self.simulation_config = config["Simulation"]
+
+        self.home_dir = Path(config["Paths"]["Home directory"])
+        self.save_path = Path(config["Paths"]["Save directory"])
+        self.checkpoints_path = Path(config["Paths"]["Checkpoint directory"])
     
     def run(self, only_plot: bool=False):
-        if self.config["Experiment"]["Experiment type"] == "Mutagenese":
+        if self.experiment_config["Experiment type"] == "Mutagenese":
             if not only_plot:
-                self.prepare_mutagenese()
-            if self.config["Mutagenese"]["Variable"] != "No variable":
-                self.magnify_mutagenese()
+                self.mutagenese()
+            if self.mutagenese_config["Variable"] != "No variable":
+                self.plot_mutagenese()
+        elif self.experiment_config["Experiment type"] == "Simulation":
+            self.prepare_simulation()
 
-    def run_mutagenese(self, genome: Genome) -> list[mutations.Mutation]:
-        mutation_types = self.config["Mutations"]["Mutation types"]
-        experiment_repetitions = int(float(self.config["Mutagenese"]["Iterations"]))
-        mutations_results = []
-        for mutation_type in mutation_types:
-            mutation = MUTATIONS[mutation_type](1, genome, int(self.config["Mutations"]["l_m"]))
+
+    ############################## MUTAGENESE ##############################
             
-            mutagenese_stat.experiment(mutation, experiment_repetitions)
+    def mutagenese(self):
+        mutation_types = [MUTATIONS[mutation_type] for mutation_type in self.mutations_config["Mutation types"]]
+        experiment_repetitions = str_to_int(self.mutagenese_config["Iterations"])
+        l_m = int(self.mutations_config["l_m"])
 
-            mutation.stats.compute(mutation.theory())
-            mutations_results.append(mutation)
-        return mutations_results
+        variable = self.mutagenese_config["Variable"]
 
-    def prepare_mutagenese(self):
-        variable = self.config["Mutagenese"]["Variable"]
-        g = int(float(self.config["Genome"]["g"]))
+        results = {mutation: {} for mutation in self.mutations_config["Mutation types"]}
+
+        if variable == "No variable":
+            genome = self.prepare_mutagenese("No variable", 0)
+            for mutation, name in zip(mutation_types, self.mutations_config["Mutation types"]):
+                results[name][888] = self.run_mutagenese(mutation(1, genome, l_m), experiment_repetitions)
+            del genome # genome can be very large
+
+        else:
+            power_min = int(m.log10(float(self.mutagenese_config["From"])))
+            power_max = int(m.log10(float(self.mutagenese_config["To"])))
+            power_step = int(self.mutagenese_config["Step"])
+            for power in range(power_min, power_max + 1, power_step):
+                genome = self.prepare_mutagenese(variable, str_to_int(f"1e{power}"))
+                for mutation, name in zip(mutation_types, self.mutations_config["Mutation types"]):
+                    results[name][power] = self.run_mutagenese(mutation(1, genome, l_m), experiment_repetitions)
+                del genome # genome can be very large
         
-        z_c_factor = int(float(self.config["Genome"]["z_c_factor"]))
-        z_nc_factor = int(float(self.config["Genome"]["z_nc_factor"]))
-        if self.config["Genome"]["z_c_auto"]:
-            z_c = z_c_factor * g
+        graphics.save_stats(self.save_path, results)
+
+    def prepare_mutagenese(self, variable: str, value: int) -> Genome:
+        variable = self.mutagenese_config["Variable"]
+
+        homogeneous = self.genome_config["Homogeneous"]
+        orientation = self.genome_config["Orientation"]
+
+        if variable == "g":
+            g = value
         else:
-            z_c = int(float(self.config["Genome"]["z_c"]))
+            g = str_to_int(self.genome_config["g"])
         
-        if self.config["Genome"]["z_nc_auto"]:
-            z_nc = z_nc_factor * g
+        if variable == "z_c":
+            z_c = value
         else:
-            z_nc = int(float(self.config["Genome"]["z_nc"]))
-
-        homogeneous = self.config["Genome"]["Homogeneous"]
-        orientation = self.config["Genome"]["Orientation"]
-        if variable != "No variable":
-            for exposant in range(int(m.log10(float(self.config["Mutagenese"]["From"]))), 
-                                  int(m.log10(float(self.config["Mutagenese"]["To"]))) + 1, 
-                                  int(self.config["Mutagenese"]["Step"])):
-                
-                if variable == "g":
-                    g = int(float(f"1e{exposant}"))
-                    if self.config["Genome"]["z_c_auto"]:
-                        z_c = z_c_factor * g
-                    if self.config["Genome"]["z_nc_auto"]:
-                        z_nc = z_nc_factor * g
-
-                elif variable == "z_c":
-                    z_c = int(float(f"1e{exposant}"))
-
-                elif variable == "z_nc":
-                    z_nc = int(float(f"1e{exposant}"))
-                genome = Genome(g, z_c, z_nc, homogeneous, orientation) # type: ignore
-                print(genome)
-                mutations_results = self.run_mutagenese(genome)
-                for mutation in mutations_results:
-                    graphics.save_stats(self.save_path / mutation.type, f"{variable}_{exposant}", mutation.stats.d_stats)
+            z_c_factor = str_to_int(self.genome_config["z_c_factor"])
+            if self.genome_config["z_c_auto"]:
+                z_c = z_c_factor * g
+            else:
+                z_c = str_to_int(self.genome_config["z_c"])
+        
+        if variable == "z_nc":
+            z_nc = value
         else:
-            genome = Genome(g, z_c, z_nc, homogeneous, orientation) # type: ignore
-            mutations_results = self.run_mutagenese(genome)
-            for mutation in mutations_results:
-                graphics.save_stats(self.save_path / mutation.type, "control", mutation.stats.d_stats)
+            z_nc_factor = str_to_int(self.genome_config["z_nc_factor"])
+            if self.genome_config["z_nc_auto"]:
+                z_nc = z_nc_factor * g
+            else:
+                z_nc = str_to_int(self.genome_config["z_nc"])
+
+        return Genome(g, z_c, z_nc, homogeneous, orientation)   
+
+    def run_mutagenese(self, mutation: mutations.Mutation, experiment_repetitions: int) -> dict[str, float]:
+        for _ in tqdm(range(experiment_repetitions), "Experiment progress... ", experiment_repetitions):
+            if mutation.is_neutral():
+                mutation.apply(virtually=True)
+
+        mutation.stats.compute(mutation.theory())
+
+        return mutation.stats.d_stats
     
-    def magnify_mutagenese(self):
-        variable = self.config["Mutagenese"]["Variable"]
+    def plot_mutagenese(self):
+        variable = self.mutagenese_config["Variable"]
 
-        power_min = int(m.log10(float(self.config["Mutagenese"]["From"])))
-        power_max = int(m.log10(float(self.config["Mutagenese"]["To"])))
-        power_step = int(self.config["Mutagenese"]["Step"])
+        power_min = int(m.log10(float(self.mutagenese_config["From"])))
+        power_max = int(m.log10(float(self.mutagenese_config["To"])))
+        power_step = int(self.mutagenese_config["Step"])
 
         x_value = [10 ** power for power in range(power_min, power_max + 1, power_step)]
 
-        mutation_types = self.config["Mutations"]["Mutation types"]
+        mutation_types = self.mutations_config["Mutation types"]
+
         for mutation_type in mutation_types:
-            mutation = MUTATIONS[mutation_type](1, Genome(1, 1, 1), int(self.config["Mutations"]["l_m"]))
+            save_dir = self.save_path / mutation_type
 
             neutral_proportions = []
             neutral_stds =[]
@@ -129,9 +154,9 @@ class Experiment:
             length_means = []
             length_stds = []
             
-            for value in range(power_min, power_max + 1, power_step):
+            for power in range(power_min, power_max + 1, power_step):
 
-                with open(self.save_path / mutation.type / f"{variable}_{value}.json", "r", encoding="utf8") as json_file:
+                with open(save_dir / f"{power}.json", "r", encoding="utf8") as json_file:
                     d_stats = json.load(json_file)
 
                 neutral_proportions.append(d_stats["Neutral mutations proportion"])
@@ -139,7 +164,66 @@ class Experiment:
                 theoretical_proportions.append(d_stats["Neutral probability theory"])
                 length_means.append(d_stats["Length mean"])
                 length_stds.append(d_stats["Length standard deviation of mean estimator"])
-            graphics.plot_and_save_mutagenese(x_value, neutral_proportions, neutral_stds, self.save_path / mutation.type, f"Neutral {mutation.type} proportion", 
-                                              variable, YLIMITS_NEAUTRALITY[variable][mutation.type], theoretical_proportions)
-            graphics.plot_and_save_mutagenese(x_value, length_means, length_stds, self.save_path / mutation.type, f"{mutation.type.capitalize()} length mean", 
-                                              variable, YLIMITS_LENGTH[variable][mutation.type])
+            
+            graphics.plot_mutagenese(x_value, neutral_proportions, neutral_stds, save_dir, f"Neutral {mutation_type.lower()} proportion", 
+                                     variable, YLIMITS_NEAUTRALITY[variable][mutation_type], theoretical_proportions)
+            
+            graphics.plot_mutagenese(x_value, length_means, length_stds, save_dir, f"{mutation_type} length mean", 
+                                     variable, YLIMITS_LENGTH[variable][mutation_type])
+    
+    ############################## SIMULATION ##############################
+
+    def run_simulation(self, genomes: list[Genome], population_size: int, generations: int):
+        genomes = self.prepare_simulation()
+        l_m = int(self.mutations_config["l_m"])
+        mutation_rates = [float(self.mutation_rates_config[f"{mutation_type} rate"]) for mutation_type in self.mutations_config["Mutation types"]]
+        mutations = [MUTATIONS[mutation_type](mutation_rates[mutation_index], genome=None, l_m=l_m) for mutation_index, mutation_type in enumerate(self.mutations_config["Mutation types"])]
+        total_mutation_rate = sum(mutation_rates)
+        generations = str_to_int(self.simulation_config["Generations"])
+        for generation in range(generations):
+            living_indices = []
+            for genome_index, genome in enumerate(genomes):
+                mutation_number = rd.binomialvariate(genome.length, p=total_mutation_rate)
+                mutation_events = rd.choices(mutations, weights=mutation_rates, k=mutation_number)
+                for mutation_event in mutation_events:
+                    mutation_event.genome = genome
+                    if mutation_event.is_neutral():
+                        mutation_event.apply()
+                        living_indices.append(genome_index)
+                    else:
+                        if self.config_simulation["Optimize"]:
+                            # individual is dead, doing the other mutations is useless
+                            break
+        
+        print(sum(genome.length for genome in genomes) / len(genomes))
+                
+
+
+
+
+    
+    def prepare_simulation(self) -> list[Genome]:
+        homogeneous = self.genome_config["Homogeneous"]
+        orientation = self.genome_config["Orientation"]
+        g = str_to_int(self.genome_config["g"])
+
+        z_c_factor = str_to_int(self.genome_config["z_c_factor"])
+        if self.genome_config["z_c_auto"]:
+            z_c = z_c_factor * g
+        else:
+            z_c = str_to_int(self.genome_config["z_c"])
+
+        z_nc_factor = str_to_int(self.genome_config["z_nc_factor"])
+        if self.genome_config["z_nc_auto"]:
+            z_nc = z_nc_factor * g
+        else:
+            z_nc = str_to_int(self.genome_config["z_nc"])
+
+        population = str_to_int(self.simulation_config["Population size"])
+
+        return [Genome(g, z_c, z_nc, homogeneous, orientation) for _ in range(population)]
+
+def str_to_int(string: str) -> int:
+    return int(float(string))
+
+
