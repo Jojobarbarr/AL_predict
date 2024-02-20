@@ -49,7 +49,7 @@ class Experiment:
         self.genome_config = config["Genome"]
         self.mutation_rates_config = config["Mutation rates"]
         self.mutagenese_config = config["Mutagenese"]
-        # self.simulation_config = config["Simulation"]
+        self.simulation_config = config["Simulation"]
 
         self.home_dir = Path(config["Paths"]["Home directory"])
         self.save_path = Path(config["Paths"]["Save directory"])
@@ -62,7 +62,7 @@ class Experiment:
             if self.mutagenese_config["Variable"] != "No variable":
                 self.plot_mutagenese()
         elif self.experiment_config["Experiment type"] == "Simulation":
-            self.prepare_simulation()
+            self.run_simulation()
 
 
     ############################## MUTAGENESE ##############################
@@ -173,30 +173,81 @@ class Experiment:
     
     ############################## SIMULATION ##############################
 
-    def run_simulation(self, genomes: list[Genome], population_size: int, generations: int):
-        genomes = self.prepare_simulation()
-        l_m = int(self.mutations_config["l_m"])
-        mutation_rates = [float(self.mutation_rates_config[f"{mutation_type} rate"]) for mutation_type in self.mutations_config["Mutation types"]]
-        mutations = [MUTATIONS[mutation_type](mutation_rates[mutation_index], genome=None, l_m=l_m) for mutation_index, mutation_type in enumerate(self.mutations_config["Mutation types"])]
-        total_mutation_rate = sum(mutation_rates)
+    def run_simulation(self):
         generations = str_to_int(self.simulation_config["Generations"])
+
+        plot_point = generations // int(self.simulation_config["Plot points"])
+        plot_count = 0
+
+        genomes = self.prepare_simulation()
+
+        l_m = int(self.mutations_config["l_m"])
+        mutation_types = self.mutations_config["Mutation types"]
+
+        mutation_rates = np.array([float(self.mutation_rates_config[f"{mutation_type} rate"]) 
+                                   for mutation_type in mutation_types])
+        mutations = np.array([MUTATIONS[mutation_type](mutation_rates[mutation_index], genome=None, l_m=l_m) 
+                              for mutation_index, mutation_type in enumerate(mutation_types)])
+        
+        total_mutation_rate = sum(mutation_rates)
+
+        generations = str_to_int(self.simulation_config["Generations"])
+
         for generation in range(generations):
+            if generation % plot_point == 0:
+                print(f"Generation {generation} / {generations}")
             living_indices = []
+            genomes_stats = []
             for genome_index, genome in enumerate(genomes):
+                is_dead = False
                 mutation_number = rd.binomialvariate(genome.length, p=total_mutation_rate)
-                mutation_events = rd.choices(mutations, weights=mutation_rates, k=mutation_number)
+                mutation_events = np.random.choice(mutations, size=mutation_number, p=mutation_rates / total_mutation_rate)
+
                 for mutation_event in mutation_events:
                     mutation_event.genome = genome
                     if mutation_event.is_neutral():
                         mutation_event.apply()
-                        living_indices.append(genome_index)
+                        # genome.check(mutation_event)
                     else:
-                        if self.config_simulation["Optimize"]:
-                            # individual is dead, doing the other mutations is useless
-                            break
+                        is_dead = True
+                        break
         
-        print(sum(genome.length for genome in genomes) / len(genomes))
-                
+                if not is_dead:
+                    living_indices.append(genome_index)
+                    if generation % plot_point == 0:
+                        genome.compute_stats()
+                        genomes_stats.append(genome.stats.d_stats)
+
+            if generation % plot_point == 0:
+                living_percentage = len(living_indices) / len(genomes) * 100
+                z_nc_list = sorted([genomes[index].z_nc for index in living_indices])
+                z_nc_min = z_nc_list[0]
+                z_nc_max = z_nc_list[-1]
+                z_nc_median = z_nc_list[len(z_nc_list) // 2]
+                population_stats = {
+                    "Living percentage": living_percentage,
+                    "z_nc min": z_nc_min,
+                    "z_nc max": z_nc_max,
+                    "z_nc median": z_nc_median
+                }
+                graphics.save_checkpoint(self.save_path, genomes_stats, population_stats, generation)
+
+                plot_count += 1
+                           
+            
+            if len(living_indices) == 0:
+                print(f"Generation {generation} - All individuals are dead")
+                break
+
+            new_genomes = []
+            while len(new_genomes) < len(genomes):
+                for index in living_indices:
+                    if rd.random() < 0.5:
+                        new_genomes.append(genomes[index])
+            genomes = new_genomes[:len(genomes)]
+
+        print(f"Generation {generation} - End of simulation")
+
 
 
 

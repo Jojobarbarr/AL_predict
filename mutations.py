@@ -44,15 +44,19 @@ class Mutation:
         """
         self.stats.count += 1
 
-    def apply(self, virtually: bool=False):
+    def apply(self, virtually: bool=False, switched: bool=False):
         """If this method is called, it means a mutation occurs and is neutral. The neutral mutation counter is incremented as well as the length sum.
         
         Args:
             virtually (bool, optional): If True, mutation isn't applied. Defaults to False.
         """
         self.stats.neutral_count += 1
+        if switched:
+            self.length = self.genome.length - self.length
         self.stats.length_sum += self.length
         self.stats.length_square_sum += self.length ** 2
+        
+
 
     def Bernoulli(self, p: float) -> bool:
         """Perform a Bernoulli trial with parameter p, 0 <= p <= 1.
@@ -298,10 +302,10 @@ class Deletion(Mutation):
             # without deleting more than self.length
             if self.starting_point > self.genome.loci[-1]:
                 end_deletion_length = min(self.genome.length - self.starting_point, self.length)
-                self.genome.delete(self.genome.loci[-1], end_deletion_length)
-                self.genome.delete(0, self.length - end_deletion_length)
+                self.genome.delete(self.genome.loci[-1], end_deletion_length, "D1")
+                self.genome.delete(0, self.length - end_deletion_length, "D2")
             else:
-                self.genome.delete(self.starting_point, self.length)
+                self.genome.delete(self.starting_point, self.length, "D3")
     
     def test(self, starting_point_nc_coord: int, answer: int):
         """Test the implementation.
@@ -553,21 +557,18 @@ class Inversion(Mutation):
         """
         super().__init__(rate, "Inversion", genome, DEBUG)
     
-    def set_breaking_locus(self):
+    def set_breaking_locus(self) -> bool:
         switched = False
         breaking_locus = rd.sample(range(0, self.genome.z_nc + self.genome.g), 2)
         if breaking_locus[1] < breaking_locus[0]:
-            breaking_locus[0], breaking_locus[1] = breaking_locus[0], breaking_locus[1]
+            breaking_locus[0], breaking_locus[1] = breaking_locus[1], breaking_locus[0]
             switched = True
         next_promoter_locus_index_starting_point = self.genome.insertion_binary_search(breaking_locus[0])
         next_promoter_locus_index_ending_point = self.genome.insertion_binary_search(breaking_locus[1])
-
-        self.starting_point = breaking_locus[0] + (self.genome.gene_length - 1) * (next_promoter_locus_index_starting_point - 1)
-        ending_point = breaking_locus[1] + (self.genome.gene_length - 1) * (next_promoter_locus_index_ending_point - 1)
+        self.starting_point = breaking_locus[0] + (self.genome.gene_length - 1) * next_promoter_locus_index_starting_point
+        ending_point = breaking_locus[1] + (self.genome.gene_length - 1) * next_promoter_locus_index_ending_point
         self.length = ending_point - self.starting_point
-        if switched:
-            self.length = self.genome.length - self.length
-    
+        return switched
 
 
 
@@ -595,11 +596,12 @@ class Inversion(Mutation):
         Args:
             virtually (bool, optional): If True, mutation isn't applied. Defaults to False.
         """
-        self.set_breaking_locus()
-        super().apply()
+        switched = self.set_breaking_locus()
+        length = self.length
+        super().apply(switched=switched)
         
         if not virtually:
-            self.genome.inverse(self.starting_point, self.length)
+            self.genome.inverse(self.starting_point, length)
     
     def test(self, starting_point_nc_coord: int, answer1: int, ending_point_nc_coord: int, answer2: int):
         """Test the implementation.

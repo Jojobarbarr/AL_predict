@@ -3,6 +3,8 @@ import random as rd
 import numpy as np
 import numpy.typing as npt
 
+from stats import GenomeStatistics
+
 
 class Genome:
     def __init__(self, g: int, z_c: int, z_nc: int, homogeneous: bool=False, orientation: bool=False, DEBUG: bool=False):
@@ -15,7 +17,6 @@ class Genome:
             orientation (bool): if True, every genes are in the same direction.
             DEBUG (bool, optional): Flag to activate prints and explicit genome visualisation. Defaults to False.
         """
-        print("Genome initialisation...")
         if g == 1 and z_c == 1 and z_nc == 1:
             # Dummy genome, no calculation will be done on it.
             return None
@@ -27,14 +28,14 @@ class Genome:
         self.orientation = orientation
 
         self.DEBUG = DEBUG
-        
+
+        self.stats = GenomeStatistics() 
         self.gene_length = self.z_c // self.g
         self.nc_proportion = self.z_nc / self.length
         self.max_length_neutral = 0
         self.loci, self.orientation_list, self.genome = self.init_genome()
         
         self.update_features()
-        print("Genome initialisation done.")
 
     def __str__(self) -> str:
         """Print the representation of the genome.
@@ -184,14 +185,14 @@ class Genome:
         """
         end_locus = locus + length
         locus_affected = np.logical_and(self.loci >= locus, self.loci < end_locus)
-        self.loci[locus_affected] = end_locus - (self.loci[locus_affected] - locus) - 1
+        self.loci[locus_affected] = (locus - 1) + (end_locus - (self.loci[locus_affected][::-1] + self.gene_length - 1))
         self.orientation_list[locus_affected] = -self.orientation_list[locus_affected][::-1]
         self.update_features()
         if self.DEBUG:
             self.genome = self.update_genome(self.loci)
 
     
-    def delete(self, locus: int, length: int):
+    def delete(self, locus: int, length: int, origin=""):
         """Deletion method. Shift all the affected promoters (> locus) by length.
 
         Args:
@@ -246,6 +247,21 @@ class Genome:
             genome = np.append(genome, [1] * self.gene_length)
         genome = np.append(genome, [0] * (self.length - len(genome)))
         return genome
+
+    def compute_stats(self):
+        """Compute the genome statistics.
+        """
+        self.stats.compute(self)
+
+    def check(self, mutation):
+        self.intervals_between_loci = sorted([self.loci[i] - self.loci[i-1] - self.gene_length 
+                                              for i in range(1, len(self.loci))])
+        if self.intervals_between_loci[0] < 0:
+            print(self.intervals_between_loci[:5])
+            print(mutation.type)
+            print("length:", mutation.length)
+            print("start point:", mutation.starting_point)
+        
 
 
 if __name__ == "__main__":

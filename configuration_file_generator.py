@@ -182,42 +182,42 @@ class ConfigGenerator(QWidget):
         self.mutation_rates_groupbox.setLayout(mutation_rates_layout)
 
         # POINT MUTATIONS RATE
-        self.point_mutations_rate_label = QLabel('Point mutations rate: ')
+        self.point_mutations_rate_label = QLabel('Point mutation rate: ')
         mutation_rates_layout.addWidget(self.point_mutations_rate_label, 0, 0)
         self.point_mutations_rate_edit = QLineEdit()
         self.point_mutations_rate_edit.setText('1e-9')
         mutation_rates_layout.addWidget(self.point_mutations_rate_edit, 0, 1)
 
         # SMALL INSERTIONS RATE
-        self.small_insertions_rate_label = QLabel('Small insertions rate: ')
+        self.small_insertions_rate_label = QLabel('Small insertion rate: ')
         mutation_rates_layout.addWidget(self.small_insertions_rate_label, 1, 0)
         self.small_insertions_rate_edit = QLineEdit()
         self.small_insertions_rate_edit.setText('1e-9')
         mutation_rates_layout.addWidget(self.small_insertions_rate_edit, 1, 1)
 
         # SMALL DELETIONS RATE
-        self.small_deletions_rate_label = QLabel('Small deletions rate: ')
+        self.small_deletions_rate_label = QLabel('Small deletion rate: ')
         mutation_rates_layout.addWidget(self.small_deletions_rate_label, 2, 0)
         self.small_deletions_rate_edit = QLineEdit()
         self.small_deletions_rate_edit.setText('1e-9')
         mutation_rates_layout.addWidget(self.small_deletions_rate_edit, 2, 1)
 
         # DELETIONS RATE
-        self.deletions_rate_label = QLabel('Deletions rate: ')
+        self.deletions_rate_label = QLabel('Deletion rate: ')
         mutation_rates_layout.addWidget(self.deletions_rate_label, 3, 0)
         self.deletions_rate_edit = QLineEdit()
         self.deletions_rate_edit.setText('1e-9')
         mutation_rates_layout.addWidget(self.deletions_rate_edit, 3, 1)
 
         # DUPLICATIONS RATE
-        self.duplications_rate_label = QLabel('Duplications rate: ')
+        self.duplications_rate_label = QLabel('Duplication rate: ')
         mutation_rates_layout.addWidget(self.duplications_rate_label, 4, 0)
         self.duplications_rate_edit = QLineEdit()
         self.duplications_rate_edit.setText('1e-9')
         mutation_rates_layout.addWidget(self.duplications_rate_edit, 4, 1)
 
         # INVERSIONS RATE
-        self.inversions_rate_label = QLabel('Inversions rate: ')
+        self.inversions_rate_label = QLabel('Inversion rate: ')
         mutation_rates_layout.addWidget(self.inversions_rate_label, 5, 0)
         self.inversions_rate_edit = QLineEdit()
         self.inversions_rate_edit.setText('1e-9')
@@ -272,11 +272,39 @@ class ConfigGenerator(QWidget):
 
         self.main_layout.addWidget(self.mutagenese_groupbox, 2, 1)
 
+        ## SIMULATION ##
+        self.simulation_groupbox = QGroupBox('Simulation')
+        simulation_layout = QGridLayout()
+        self.simulation_groupbox.setLayout(simulation_layout)
+
+        # GENERATION #
+        self.generation_label = QLabel('Generation: ')
+        simulation_layout.addWidget(self.generation_label, 0, 0)
+        self.generation_edit = QLineEdit()
+        self.generation_edit.setText("1e6")
+        simulation_layout.addWidget(self.generation_edit, 0, 1)
+
+        # POPULATION SIZE #
+        self.population_size_label = QLabel('Population size: ')
+        simulation_layout.addWidget(self.population_size_label, 1, 0)
+        self.population_size_edit = QLineEdit()
+        self.population_size_edit.setText("1e3")
+        simulation_layout.addWidget(self.population_size_edit, 1, 1)
+
+        # PLOT POINTS #
+        self.plot_points_label = QLabel("Plot points: ")
+        simulation_layout.addWidget(self.plot_points_label, 2, 0)
+        self.plot_points_edit = QLineEdit()
+        self.plot_points_edit.setText("10")
+        simulation_layout.addWidget(self.plot_points_edit, 2, 1)
+
+        self.main_layout.addWidget(self.simulation_groupbox, 3, 0)
+
 
         ## GENERATION BUTTON ##
         self.generate_button = QPushButton('Generate configuration file')
         self.generate_button.clicked.connect(self.generate_config)
-        self.main_layout.addWidget(self.generate_button, 3, 0, 1, 2)
+        self.main_layout.addWidget(self.generate_button, 4, 0, 2, 2)
 
 
         ## SCROLL BAR ##
@@ -331,6 +359,7 @@ class ConfigGenerator(QWidget):
                     item.widget().setEnabled(True)
             if experiment_type == "Mutagenese":
                 self.mutation_rates_groupbox.setEnabled(False)
+                self.simulation_groupbox.setEnabled(False)
             elif experiment_type == "Simulation":
                 self.mutagenese_groupbox.setEnabled(False)
             if self.variable_combo.currentText() == "No variable":
@@ -409,6 +438,13 @@ class ConfigGenerator(QWidget):
             "From": self.range_min_edit.text(),
             "To": self.range_max_edit.text(),
             "Step": self.range_step_edit.text(),
+        }
+
+        ## SIMULATION ##
+        d_params["Simulation"] = {
+            "Generations": self.generation_edit.text(),
+            "Population size": self.population_size_edit.text(),
+            "Plot points": self.plot_points_edit.text(),
         }
 
         ## SAVE FILE ##
