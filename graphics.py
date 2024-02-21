@@ -2,7 +2,8 @@ import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-
+import numpy.typing as npt
+import numpy as np
 from stats import GenomeStatistics
 
 ## MUTAGENESE
@@ -36,5 +37,16 @@ def plot_mutagenese(x_value: list[float], y_value: list[float], y_std: list[floa
 def save_checkpoint(save_dir: Path, genome_stats: list[dict[str, float]], population_stats: dict[str, float], generation: int):
     save_dir.mkdir(parents=True, exist_ok=True)
     all_stats = {"genome": genome_stats, "population": population_stats}
-    with open(save_dir / f"checkpoint_{generation}.json", "w", encoding="utf8") as json_file:
+    with open(save_dir / f"generation_{generation}.json", "w", encoding="utf8") as json_file:
         json.dump(all_stats, json_file, indent=2)
+
+def plot_simulation(x_value: npt.NDArray[np.int_], y_value: npt.NDArray[np.float_], std_values: npt.NDArray[np.float_],
+                    save_path: Path, name: str):
+    plt.clf()
+    plt.plot(x_value, y_value, marker='o', label="Estimation")
+    # plt.errorbar(x_value, y_value, std_values, linestyle='None', marker='o')
+    plt.title(f"{name} over generations")
+    plt.xlabel("Generation")
+    plt.ylabel(f"{name}")
+    plt.legend()
+    plt.savefig(save_path / f"{name.lower().replace(' ', '_')}.jpg")

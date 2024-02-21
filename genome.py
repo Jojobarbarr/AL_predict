@@ -52,6 +52,9 @@ class Genome:
                 f"gene_length: {self.gene_length}\n"
         )
     
+    def clone(self):
+        return Genome(self.g, self.z_c, self.z_nc, self.homogeneous, self.orientation, self.DEBUG)
+    
     def init_genome(self):
         """Create a random genome respecting the constraints given by the user.
         """

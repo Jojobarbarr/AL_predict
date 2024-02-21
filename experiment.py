@@ -62,7 +62,11 @@ class Experiment:
             if self.mutagenese_config["Variable"] != "No variable":
                 self.plot_mutagenese()
         elif self.experiment_config["Experiment type"] == "Simulation":
-            self.run_simulation()
+            if not only_plot:
+                self.run_simulation()
+            self.plot_simulation()
+
+            
 
 
     ############################## MUTAGENESE ##############################
@@ -191,8 +195,6 @@ class Experiment:
         
         total_mutation_rate = sum(mutation_rates)
 
-        generations = str_to_int(self.simulation_config["Generations"])
-
         for generation in range(generations):
             if generation % plot_point == 0:
                 print(f"Generation {generation} / {generations}")
@@ -207,7 +209,6 @@ class Experiment:
                     mutation_event.genome = genome
                     if mutation_event.is_neutral():
                         mutation_event.apply()
-                        # genome.check(mutation_event)
                     else:
                         is_dead = True
                         break
@@ -217,6 +218,10 @@ class Experiment:
                     if generation % plot_point == 0:
                         genome.compute_stats()
                         genomes_stats.append(genome.stats.d_stats)
+
+            if len(living_indices) == 0:
+                print(f"Generation {generation} - All individuals are dead")
+                break
 
             if generation % plot_point == 0:
                 living_percentage = len(living_indices) / len(genomes) * 100
@@ -234,24 +239,11 @@ class Experiment:
 
                 plot_count += 1
                            
-            
-            if len(living_indices) == 0:
-                print(f"Generation {generation} - All individuals are dead")
-                break
 
-            new_genomes = []
-            while len(new_genomes) < len(genomes):
-                for index in living_indices:
-                    if rd.random() < 0.5:
-                        new_genomes.append(genomes[index])
-            genomes = new_genomes[:len(genomes)]
+            parents = rd.choices(living_indices, k=len(genomes))
+            genomes = [genomes[parent].clone() for parent in parents]
 
         print(f"Generation {generation} - End of simulation")
-
-
-
-
-
     
     def prepare_simulation(self) -> list[Genome]:
         homogeneous = self.genome_config["Homogeneous"]
@@ -271,8 +263,74 @@ class Experiment:
             z_nc = str_to_int(self.genome_config["z_nc"])
 
         population = str_to_int(self.simulation_config["Population size"])
-
         return [Genome(g, z_c, z_nc, homogeneous, orientation) for _ in range(population)]
+    
+    def plot_simulation(self):
+        generations = str_to_int(self.simulation_config["Generations"])
+
+        x_value = np.array([generation for generation in range(0, generations, generations // int(self.simulation_config["Plot points"]))])
+        
+        genomes_nc_mean = np.empty(len(x_value))
+        genomes_nc_var = np.empty(len(x_value))
+        genomes_nc_length_min_mean = np.empty(len(x_value))
+        genomes_nc_length_min_var = np.empty(len(x_value))
+        genomes_nc_length_max_mean = np.empty(len(x_value))
+        genomes_nc_length_max_var = np.empty(len(x_value))
+        genomes_nc_length_median_mean = np.empty(len(x_value))
+        genomes_nc_length_median_var = np.empty(len(x_value))
+
+        population_living_percentage = np.empty(len(x_value))
+        population_nc_length_min = np.empty(len(x_value))
+        population_nc_length_max = np.empty(len(x_value))
+        population_nc_length_median = np.empty(len(x_value))
+
+
+        
+        for index, x in enumerate(x_value):
+            with open(self.save_path / f"generation_{x}.json", "r", encoding="utf8") as json_file:
+                stats = json.load(json_file)
+            
+            genome_raw_stats = stats["genome"]
+            population_raw_stats = stats["population"]
+
+            nc_prop = np.array([genome["Non coding proportion"] for genome in genome_raw_stats])
+            genomes_nc_mean[index] = nc_prop.mean()
+            genomes_nc_var[index] = nc_prop.var() * len(genome_raw_stats) / (len(genome_raw_stats) - 1)
+
+            nc_length_min = np.array([genome["Non coding length min"] for genome in genome_raw_stats])
+            genomes_nc_length_min_mean[index] = nc_length_min.mean()
+            genomes_nc_length_min_var[index] = nc_length_min.var() ** 0.5
+
+            nc_length_max = np.array([genome["Non coding length max"] for genome in genome_raw_stats])
+            genomes_nc_length_max_mean[index] = nc_length_max.mean()
+            genomes_nc_length_max_var[index] = nc_length_max.var() ** 0.5
+
+            nc_length_median = np.array([genome["Non coding length median"] for genome in genome_raw_stats])
+            genomes_nc_length_median_mean[index] = nc_length_median.mean()
+            genomes_nc_length_median_var[index] = nc_length_median.var() ** 0.5
+
+            population_living_percentage[index] = population_raw_stats["Living percentage"]
+            population_nc_length_min[index] = population_raw_stats["z_nc min"]
+            population_nc_length_max[index] = population_raw_stats["z_nc max"]
+            population_nc_length_median[index] = population_raw_stats["z_nc median"]
+
+        null_var = np.zeros(len(x_value))
+
+        print(f"genomes_nc_length_median_mean: {genomes_nc_length_median_mean}")
+        
+        graphics.plot_simulation(x_value, genomes_nc_mean, genomes_nc_var, self.save_path, "Genomes non coding proportion")
+        graphics.plot_simulation(x_value, genomes_nc_length_min_mean, genomes_nc_length_min_var, self.save_path, "Genomes non coding length min")
+        graphics.plot_simulation(x_value, genomes_nc_length_max_mean, genomes_nc_length_max_var, self.save_path, "Genomes non coding length max")
+        graphics.plot_simulation(x_value, genomes_nc_length_median_mean, genomes_nc_length_median_var, self.save_path, "Genomes non coding length median")
+        graphics.plot_simulation(x_value, population_living_percentage, null_var, self.save_path, "Population living percentage")
+        graphics.plot_simulation(x_value, population_nc_length_min, null_var, self.save_path, "Population z_nc min")
+        graphics.plot_simulation(x_value, population_nc_length_max, null_var, self.save_path, "Population z_nc max")
+        graphics.plot_simulation(x_value, population_nc_length_median, null_var, self.save_path, "Population z_nc median")
+
+
+
+
+    
 
 def str_to_int(string: str) -> int:
     return int(float(string))
