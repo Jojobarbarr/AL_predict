@@ -126,6 +126,14 @@ class Mutation:
         
         return False
     
+    def theory(self) -> tuple[float, float]:
+        """Returns the theoretical mutation neutrality probability from the mathematical model.
+
+        Returns:
+            float: mutation neutrality probability
+        """
+        return (0, 0)
+    
 
 
 

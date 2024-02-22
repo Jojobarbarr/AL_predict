@@ -2,7 +2,8 @@ import argparse
 import json
 from pathlib import Path
 
-from experiment import Experiment
+from mutagenese import Mutagenese
+from simulation import Simulation
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(prog="AL_predict", description="Evolution model from a math model over genome structure.")
@@ -15,7 +16,10 @@ if __name__ == "__main__":
     with open(args.config_file, "r", encoding="utf8") as json_file:
         config = json.load(json_file)
 
-    experiment = Experiment(config)
+    if config["Experiment"]["Experiment type"] == "Mutagenese":
+        experiment = Mutagenese(config)
+    elif config["Experiment"]["Experiment type"] == "Simulation":
+        experiment = Simulation(config)
 
     experiment.run(only_plot=args.only_plot)
     

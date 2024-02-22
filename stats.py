@@ -60,6 +60,7 @@ class GenomeStatistics(Statistics):
         self.nc_min = 0
         self.nc_max = 0
         self.nc_median = 0
+        self.d_stats = {}
         
     def compute(self, genome) -> None:
         self.nc_proportion = genome.z_nc / genome.length
@@ -68,10 +69,10 @@ class GenomeStatistics(Statistics):
             self.nc_max = self.nc_min
             self.nc_median = self.nc_min
         else:
-            self.intervals_between_loci = sorted([genome.loci[i] - genome.loci[i-1] - genome.gene_length 
+            intervals_between_loci = sorted([genome.loci[i] - genome.loci[i-1] - genome.gene_length 
                                                   for i in range(1, len(genome.loci))])
-            self.extremum_between_indices(genome)
-            self.nc_median = self.intervals_between_loci[len(self.intervals_between_loci) // 2]
+            self.extremum_between_indices(genome, intervals_between_loci)
+            self.nc_median = intervals_between_loci[len(intervals_between_loci) // 2]
         self.d_stats = {
             "Non coding proportion": self.nc_proportion,
             "Non coding length min": int(self.nc_min),
@@ -79,7 +80,7 @@ class GenomeStatistics(Statistics):
             "Non coding length median": int(self.nc_median),
         }
         
-    def extremum_between_indices(self, genome) -> int | None:
+    def extremum_between_indices(self, genome, intervals_between_loci) -> int | None:
         nc_at_junction = genome.length + genome.loci[0] - genome.loci[-1] - genome.gene_length
-        self.nc_min = min(self.intervals_between_loci[0], nc_at_junction)
-        self.nc_max = max(self.intervals_between_loci[-1], nc_at_junction)
+        self.nc_min = min(intervals_between_loci[0], nc_at_junction)
+        self.nc_max = max(intervals_between_loci[-1], nc_at_junction)

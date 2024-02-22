@@ -20,10 +20,13 @@ class Genome:
         if g == 1 and z_c == 1 and z_nc == 1:
             # Dummy genome, no calculation will be done on it.
             return None
+        
         self.z_c = z_c
         self.z_nc = z_nc
         self.length = self.z_c + self.z_nc
+
         self.g = g
+        
         self.homogeneous = homogeneous
         self.orientation = orientation
 
@@ -31,7 +34,6 @@ class Genome:
 
         self.stats = GenomeStatistics() 
         self.gene_length = self.z_c // self.g
-        self.nc_proportion = self.z_nc / self.length
         self.max_length_neutral = 0
         self.loci, self.orientation_list, self.genome = self.init_genome()
         
