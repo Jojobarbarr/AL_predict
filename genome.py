@@ -7,7 +7,7 @@ from stats import GenomeStatistics
 
 
 class Genome:
-    def __init__(self, g: int, z_c: int, z_nc: int, homogeneous: bool=False, orientation: bool=False, DEBUG: bool=False):
+    def __init__(self, g: int, z_c: int, z_nc: int, homogeneous: bool=False, orientation: bool=False, generation: int=0, DEBUG: bool=False):
         """
         Args:
             g (int): number of coding segments.
@@ -32,12 +32,16 @@ class Genome:
 
         self.DEBUG = DEBUG
 
-        self.stats = GenomeStatistics() 
+
+        self.stats = GenomeStatistics()
+        self.stats_computed = False
         self.gene_length = self.z_c // self.g
         self.max_length_neutral = 0
         self.loci, self.orientation_list, self.genome = self.init_genome()
+        self.loci_interval = np.empty(self.g)
+        self.last_change = generation
+        self.update_features(generation)
         
-        self.update_features()
 
     def __str__(self) -> str:
         """Print the representation of the genome.
@@ -55,7 +59,25 @@ class Genome:
         )
     
     def clone(self):
-        return Genome(self.g, self.z_c, self.z_nc, self.homogeneous, self.orientation, self.DEBUG)
+        genome = Genome(1, 1, 1)
+        genome.DEBUG = self.DEBUG
+        genome.z_c = self.z_c
+        genome.z_nc = self.z_nc
+        genome.length = self.length
+        genome.g = self.g
+        genome.homogeneous = self.homogeneous
+        genome.orientation = self.orientation
+        genome.stats = self.stats.clone()
+        genome.stats_computed = True
+        genome.gene_length = self.gene_length
+        genome.max_length_neutral = self.max_length_neutral
+        genome.loci = self.loci.copy()
+        genome.orientation_list = self.orientation_list.copy()
+        genome.genome = np.empty(1)
+        genome.loci_interval = self.loci_interval.copy()
+        genome.last_change = self.last_change
+        return genome
+
     
     def init_genome(self):
         """Create a random genome respecting the constraints given by the user.
@@ -73,7 +95,8 @@ class Genome:
                 return loci, orientation, np.empty(1)
             
             # To create homogeneous genome, promoters are regularly disposed.
-            loci = np.array([promoter * (self.gene_length + (self.z_nc // self.g)) for promoter in range(self.g)])
+            distance_between_promoters = self.gene_length + (self.z_nc // self.g)
+            loci = np.array([promoter * distance_between_promoters for promoter in range(self.g)])
             return loci, orientation, np.empty(1)
 
         ## Only executed in DEBUG mode
@@ -86,6 +109,11 @@ class Genome:
         genome = self.update_genome(loci)
 
         return loci, orientation, genome
+
+    def compute_intervals(self):
+        """Compute the intervals between the promoters.
+        """
+        self.loci_interval = np.array([self.loci[i] - self.loci[i-1] for i in range(1, len(self.loci))])
     
     def set_genome(self, z_c: int, z_nc: int, g: int, loci: npt.NDArray[np.int_], genome: npt.NDArray[np.int_], orientation: npt.NDArray[np.int_]=np.array([])):
         """Set manually an explicit genome. For DEBUG only.
@@ -167,7 +195,7 @@ class Genome:
                 right = middle - 1
         return left
 
-    def insert(self, locus: int, length: int):
+    def insert(self, locus: int, length: int, generation: int):
         """Insertion method. Shift all the affected promoters (>= locus) by length.
 
         Args:
@@ -177,11 +205,11 @@ class Genome:
         self.z_nc += length
         locus_after_insertion = self.loci >= locus
         self.loci[locus_after_insertion] += length
-        self.update_features()
+        self.update_features(generation)
         if self.DEBUG:
             self.genome = self.update_genome(self.loci)
     
-    def inverse(self, locus: int, length: int):
+    def inverse(self, locus: int, length: int, generation: int):
         """Inverse method. Reverse the sequence between locus and locus + length.
 
         Args:
@@ -192,12 +220,12 @@ class Genome:
         locus_affected = np.logical_and(self.loci >= locus, self.loci < end_locus)
         self.loci[locus_affected] = (locus - 1) + (end_locus - (self.loci[locus_affected][::-1] + self.gene_length - 1))
         self.orientation_list[locus_affected] = -self.orientation_list[locus_affected][::-1]
-        self.update_features()
+        self.update_features(generation)
         if self.DEBUG:
             self.genome = self.update_genome(self.loci)
 
     
-    def delete(self, locus: int, length: int, origin=""):
+    def delete(self, locus: int, length: int, generation: int):
         """Deletion method. Shift all the affected promoters (> locus) by length.
 
         Args:
@@ -207,35 +235,20 @@ class Genome:
         self.z_nc -= length
         locus_after_deletion = self.loci > locus
         self.loci[locus_after_deletion] -= length
-        self.update_features()
+        self.update_features(generation)
         if self.DEBUG:
             self.genome = self.update_genome(self.loci)
     
-    
-    def parse(self):
-        """Compute some genome characteristics that needs to loop through the genome.
-        """
-        self.max_length_neutral = 0
-        prev_locus = 0
-        for locus in self.loci:
-            distance = locus - prev_locus - self.gene_length
-            if distance > self.max_length_neutral:
-                self.max_length_neutral = distance
-            prev_locus = locus
-        distance = self.length - self.loci[-1] - self.gene_length + self.loci[0]
-        if distance > self.max_length_neutral:
-            self.max_length_neutral = distance
-
-    def update_features(self):
+    def update_features(self, generation: int):
         """Compute some genome charasteristics from global attributes.
         """
         self.length = self.z_c + self.z_nc
-        self.nc_proportion = self.z_nc / self.length
-        self.parse()
-        if self.DEBUG:
-            print(f"New length: {self.length}\n"
-                  f"New nc_proportion: {self.nc_proportion}\n"
-                  f"New max_length_neutral: {self.max_length_neutral}")
+        self.compute_intervals()
+        self.max_length_neutral = self.loci_interval.min()
+        distance = self.length - self.loci[-1] + self.loci[0]
+        if distance < self.max_length_neutral:
+            self.max_length_neutral = distance
+        self.last_change = generation
 
     def update_genome(self, loci: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
         """Update the explicit genome.
@@ -257,16 +270,7 @@ class Genome:
         """Compute the genome statistics.
         """
         self.stats.compute(self)
-
-    def check(self, mutation):
-        self.intervals_between_loci = sorted([self.loci[i] - self.loci[i-1] - self.gene_length 
-                                              for i in range(1, len(self.loci))])
-        if self.intervals_between_loci[0] < 0:
-            print(self.intervals_between_loci[:5])
-            print(mutation.type)
-            print("length:", mutation.length)
-            print("start point:", mutation.starting_point)
-        
+        self.stats_computed = True
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ from utils import MUTATIONS, str_to_bool, str_to_int
 class Simulation(Experiment):
     def __init__(self, config: ConfigParser):
         super().__init__(config)
-        
+        print("Initializing simulation")
         self.generations = str_to_int(self.simulation_config["Generations"])
         self.plot_point = self.generations // int(self.simulation_config["Plot points"])
 
@@ -35,6 +35,7 @@ class Simulation(Experiment):
         self.genomes = np.empty(self.population, dtype=Genome)
         self.init_population()
         self.living_genomes = np.zeros(len(self.genomes), dtype=bool)
+        print("Simulation initialized")
 
     def init_population(self):
         homogeneous = self.genome_config["Homogeneous"]
@@ -59,20 +60,12 @@ class Simulation(Experiment):
         for individual in range(self.population):
             self.genomes[individual] = Genome(g, z_c, z_nc, homogeneous, orientation) # type: ignore
     
-    def compute_genome(self, genome_index: int, generation:int):
-        mutation_number = rd.binomialvariate(self.genomes[genome_index].length, p=self.total_mutation_rate)
-        mutation_events = np.random.choice(self.mutations, size=mutation_number, p=self.mutation_rates / self.total_mutation_rate)
-        for mutation_event in mutation_events:
-            if self.mutation_is_deleterious(mutation_event, genome_index):
-                return None
-        
     
-    
-    def mutation_is_deleterious(self, mutation_event: Mutation, genome_index: int) -> bool:
+    def mutation_is_deleterious(self, mutation_event: Mutation, genome_index: int, generation: int) -> bool:
         mutation_event.genome = self.genomes[genome_index]
 
         if mutation_event.is_neutral():
-            mutation_event.apply()
+            mutation_event.apply(generation=generation)
             return False
             
         return True
@@ -95,25 +88,14 @@ class Simulation(Experiment):
                 genomes_affected = np.random.choice(range(len(self.genomes)), size=mutation_number, p=biases_genomes)
 
                 for mutation_event, genome_index in zip(mutation_events, genomes_affected):
-                    if self.mutation_is_deleterious(mutation_event, genome_index):
+                    if self.living_genomes[genome_index] and self.mutation_is_deleterious(mutation_event, genome_index, generation):
                         self.living_genomes[genome_index] = False
-                        break
 
                 if generation % self.plot_point == 0:
+                    print(f"number of living: {self.living_genomes.sum()}")
                     for genome in self.genomes[self.living_genomes]:
-                        genome.compute_stats()
-
-
-
-                # args = ((genome_index, generation) for genome_index in range(len(self.genomes)))
-                # with ProcessPoolExecutor() as executor:
-                #     for test in executor.map(self.compute_genome_parallelized, args):
-                #         pass
-
-
-
-                # for genome_index in range(len(self.genomes)):
-                #     self.compute_genome(genome_index, generation)
+                        if genome.last_change > generation - self.plot_point or not genome.stats_computed:
+                            genome.compute_stats()
                 
                 if not self.living_genomes.any():
                     print(f"Generation {generation} - All individuals are dead")
