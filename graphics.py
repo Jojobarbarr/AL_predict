@@ -16,7 +16,7 @@ def save_stats(save_dir: Path, results: dict[str, dict]) -> None:
                 json.dump(d_stats, json_file, indent=2)
 
 def plot_mutagenese(x_value: list[float], y_value: list[float], y_std: list[float], save_path: Path, name: str, 
-                    variable: str, ylimits: tuple[float | int, float | int], theoreticals: list[float]=[]):
+                    variable: str, theoreticals: list[float]=[]):
         
         plt.clf()
         plt.plot(x_value, y_value, marker='o', label="Estimation")
