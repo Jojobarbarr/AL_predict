@@ -30,7 +30,7 @@ class Mutagenese(Experiment):
 
         self.results = {mutation: {} for mutation in self.mutation_names}
 
-    def run(self, only_plot: bool=False):
+    def run(self, only_plot: bool=False, multiprocessing: bool=False):
         if not only_plot:
             if self.variable == "No variable":
                 genome = self.prepare_mutagenese(0)
