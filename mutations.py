@@ -44,7 +44,7 @@ class Mutation:
         """
         self.stats.count += 1
 
-    def apply(self, virtually: bool=False, switched: bool=False, generation: int=0):
+    def apply(self, virtually: bool=False, switched: bool=False):
         """If this method is called, it means a mutation occurs and is neutral. The neutral mutation counter is incremented as well as the length sum.
         
         Args:
@@ -191,7 +191,7 @@ class SmallInsertion(Mutation):
         super().is_neutral()
         return self.Bernoulli((self.genome.z_nc + self.genome.g) / self.genome.length) or self.DEBUG
     
-    def apply(self, virtually: bool=False, generation: int=0):
+    def apply(self, virtually: bool=False):
         """Apply the mutation. If virtually is True, all the mutation characteristics are determined but it is not applied on the genome.
 
         Args:
@@ -205,9 +205,9 @@ class SmallInsertion(Mutation):
         self.set_length()
 
         if not virtually:
-            self.genome.insert(self.insertion_locus, self.length, generation)
+            self.genome.insert(self.insertion_locus, self.length)
     
-    def test(self, insertion_locus_nc_coord: int, answer: int, generation: int=0):
+    def test(self, insertion_locus_nc_coord: int, answer: int):
         """Test the implementation.
 
         Args:
@@ -230,7 +230,7 @@ class SmallInsertion(Mutation):
               f"\n\tStarting point: {self.insertion_locus}\n"
               f"\tLength: {self.length}")
         
-        self.genome.insert(self.insertion_locus, self.length, generation)
+        self.genome.insert(self.insertion_locus, self.length, )
 
     def theory(self) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
@@ -296,7 +296,7 @@ class Deletion(Mutation):
 
         return self.ending_point_is_ok(self.set_starting_point()) or self.DEBUG
     
-    def apply(self, virtually: bool=False, generation: int=0):
+    def apply(self, virtually: bool=False):
         """Applies the mutation. If virtually is True, all the mutation characteristics are determined but it is not applied on the genome.
 
         Args:
@@ -310,12 +310,12 @@ class Deletion(Mutation):
             # without deleting more than self.length
             if self.starting_point > self.genome.loci[-1]:
                 end_deletion_length = min(self.genome.length - self.starting_point, self.length)
-                self.genome.delete(self.genome.loci[-1], end_deletion_length, generation)
-                self.genome.delete(0, self.length - end_deletion_length, generation)
+                self.genome.delete(self.genome.loci[-1], end_deletion_length)
+                self.genome.delete(0, self.length - end_deletion_length)
             else:
-                self.genome.delete(self.starting_point, self.length, generation)
+                self.genome.delete(self.starting_point, self.length)
     
-    def test(self, starting_point_nc_coord: int, answer: int, generation: int=0):
+    def test(self, starting_point_nc_coord: int, answer: int):
         """Test the implementation.
 
         Args:
@@ -357,10 +357,10 @@ class Deletion(Mutation):
         
         if self.starting_point > self.genome.loci[-1]:
             end_deletion_length = min(self.genome.length - self.starting_point, self.length)
-            self.genome.delete(self.genome.loci[-1], end_deletion_length, generation)
-            self.genome.delete(0, self.length - end_deletion_length, generation)
+            self.genome.delete(self.genome.loci[-1], end_deletion_length)
+            self.genome.delete(0, self.length - end_deletion_length)
         else:
-            self.genome.delete(self.starting_point, self.length, generation)
+            self.genome.delete(self.starting_point, self.length)
         
     def theory(self) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
@@ -481,7 +481,7 @@ class Duplication(Mutation):
 
     
         
-    def apply(self, virtually: bool=False, generation: int=0):
+    def apply(self, virtually: bool=False):
         """Applies the mutation. If virtually is True, all the mutation characteristics are determined but it is not applied on the genome.
 
         Args:
@@ -492,9 +492,9 @@ class Duplication(Mutation):
         self.map_local_to_absolute_locus(self.genome.insertion_binary_search)
 
         if not virtually:
-            self.genome.insert(self.insertion_locus, self.length, generation)
+            self.genome.insert(self.insertion_locus, self.length)
     
-    def test(self, starting_point_nc_coord: int, answer1: int, insertion_locus_nc_coord: int, answer2: int, generation: int=0):
+    def test(self, starting_point_nc_coord: int, answer1: int, insertion_locus_nc_coord: int, answer2: int):
         """Test the implementation.
 
         Args:
@@ -542,7 +542,7 @@ class Duplication(Mutation):
               f"\n\tStarting point: {self.starting_point}\n"
               f"\tLength: {self.length}\n"
               f"\tInsertion locus: {self.insertion_locus}")
-        self.genome.insert(self.insertion_locus, self.length, generation)
+        self.genome.insert(self.insertion_locus, self.length)
     
     def theory(self) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
@@ -598,7 +598,7 @@ class Inversion(Mutation):
         return self.Bernoulli((self.genome.z_nc + self.genome.g - 1) / (self.genome.length - 1)) or self.DEBUG
 
     
-    def apply(self, virtually: bool=False, generation: int=0):
+    def apply(self, virtually: bool=False):
         """Applies the mutation. If virtually is True, all the mutation characteristics are determined but it is not applied on the genome.
 
         Args:
@@ -609,9 +609,9 @@ class Inversion(Mutation):
         super().apply(switched=switched)
         
         if not virtually:
-            self.genome.inverse(self.starting_point, length, generation)
+            self.genome.inverse(self.starting_point, length)
     
-    def test(self, starting_point_nc_coord: int, answer1: int, ending_point_nc_coord: int, answer2: int, generation: int=0):
+    def test(self, starting_point_nc_coord: int, answer1: int, ending_point_nc_coord: int, answer2: int):
         """Test the implementation.
 
         Args:
@@ -656,7 +656,7 @@ class Inversion(Mutation):
               f"\n\tStarting point: {self.starting_point}\n"
               f"\tLength: {ending_point - self.starting_point}")
         
-        self.genome.inverse(self.starting_point, ending_point - self.starting_point, generation)
+        self.genome.inverse(self.starting_point, ending_point - self.starting_point)
     
     def theory(self) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.

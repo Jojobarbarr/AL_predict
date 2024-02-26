@@ -7,7 +7,7 @@ from stats import GenomeStatistics
 
 
 class Genome:
-    def __init__(self, g: int, z_c: int, z_nc: int, homogeneous: bool=False, orientation: bool=False, generation: int=0, DEBUG: bool=False):
+    def __init__(self, g: int, z_c: int, z_nc: int, homogeneous: bool=False, orientation: bool=False, DEBUG: bool=False):
         """
         Args:
             g (int): number of coding segments.
@@ -34,13 +34,11 @@ class Genome:
 
 
         self.stats = GenomeStatistics()
-        self.stats_computed = False
         self.gene_length = self.z_c // self.g
         self.max_length_neutral = 0
         self.loci, self.orientation_list, self.genome = self.init_genome()
         self.loci_interval = np.empty(self.g)
-        self.last_change = generation
-        self.update_features(generation)
+        self.update_features()
         
 
     def __str__(self) -> str:
@@ -68,14 +66,12 @@ class Genome:
         genome.homogeneous = self.homogeneous
         genome.orientation = self.orientation
         genome.stats = self.stats.clone()
-        genome.stats_computed = True
         genome.gene_length = self.gene_length
         genome.max_length_neutral = self.max_length_neutral
         genome.loci = self.loci.copy()
         genome.orientation_list = self.orientation_list.copy()
         genome.genome = np.empty(1)
         genome.loci_interval = self.loci_interval.copy()
-        genome.last_change = self.last_change
         return genome
 
     
@@ -195,7 +191,7 @@ class Genome:
                 right = middle - 1
         return left
 
-    def insert(self, locus: int, length: int, generation: int):
+    def insert(self, locus: int, length: int):
         """Insertion method. Shift all the affected promoters (>= locus) by length.
 
         Args:
@@ -205,11 +201,11 @@ class Genome:
         self.z_nc += length
         locus_after_insertion = self.loci >= locus
         self.loci[locus_after_insertion] += length
-        self.update_features(generation)
+        self.update_features()
         if self.DEBUG:
             self.genome = self.update_genome(self.loci)
     
-    def inverse(self, locus: int, length: int, generation: int):
+    def inverse(self, locus: int, length: int):
         """Inverse method. Reverse the sequence between locus and locus + length.
 
         Args:
@@ -220,12 +216,12 @@ class Genome:
         locus_affected = np.logical_and(self.loci >= locus, self.loci < end_locus)
         self.loci[locus_affected] = (locus - 1) + (end_locus - (self.loci[locus_affected][::-1] + self.gene_length - 1))
         self.orientation_list[locus_affected] = -self.orientation_list[locus_affected][::-1]
-        self.update_features(generation)
+        self.update_features()
         if self.DEBUG:
             self.genome = self.update_genome(self.loci)
 
     
-    def delete(self, locus: int, length: int, generation: int):
+    def delete(self, locus: int, length: int):
         """Deletion method. Shift all the affected promoters (> locus) by length.
 
         Args:
@@ -235,11 +231,11 @@ class Genome:
         self.z_nc -= length
         locus_after_deletion = self.loci > locus
         self.loci[locus_after_deletion] -= length
-        self.update_features(generation)
+        self.update_features()
         if self.DEBUG:
             self.genome = self.update_genome(self.loci)
     
-    def update_features(self, generation: int):
+    def update_features(self):
         """Compute some genome charasteristics from global attributes.
         """
         self.length = self.z_c + self.z_nc
@@ -248,7 +244,6 @@ class Genome:
         distance = self.length - self.loci[-1] + self.loci[0]
         if distance < self.max_length_neutral:
             self.max_length_neutral = distance
-        self.last_change = generation
 
     def update_genome(self, loci: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
         """Update the explicit genome.
