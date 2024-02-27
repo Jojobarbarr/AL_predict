@@ -37,6 +37,8 @@ def plot_mutagenese(x_value: list[float], y_value: list[float], y_std: list[floa
 def save_checkpoint(save_dir: Path, genome_stats: list[dict[str, float]], population_stats: dict[str, float], generation: int):
     save_dir.mkdir(parents=True, exist_ok=True)
     all_stats = {"genome": genome_stats, "population": population_stats}
+    if generation == 0:
+        generation += 1
     with open(save_dir / f"generation_{generation}.json", "w", encoding="utf8") as json_file:
         json.dump(all_stats, json_file, indent=2)
 

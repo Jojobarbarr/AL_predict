@@ -1,8 +1,10 @@
 import json
 import multiprocessing as mp
-import multiprocessing.sharedctypes as sct
+# from memory_profiler import profile
+# import cProfile as profile
 import pickle as pkl
 import random as rd
+import sys
 from configparser import ConfigParser
 from pathlib import Path
 from time import perf_counter
@@ -16,6 +18,19 @@ from genome import Genome
 from mutations import Mutation
 from utils import MUTATIONS, str_to_int
 
+PROFILE = False
+
+def get_size(obj):
+    size = sys.getsizeof(obj)
+    if isinstance(obj, (int, float, bool, str, tuple)):
+        return size
+    elif isinstance(obj, (list, set)):
+        size += sum(get_size(x) for x in obj)
+    elif isinstance(obj, dict):
+        size += sum(get_size(k) + get_size(v) for k, v in obj.items())
+    elif hasattr(obj, '__dict__'):
+        size += get_size(obj.__dict__)
+    return size
 
 class Simulation(Experiment):
     def __init__(self, config: ConfigParser, load_file: Path=Path("")) -> None:
@@ -34,7 +49,7 @@ class Simulation(Experiment):
         ## Multiprocessing initialization
         # TODO: Fine tune the number of workers.
         self.num_workers = min(mp.cpu_count(), 32)
-        self.num_workers = 2
+        self.num_workers = 8
 
         mp.set_start_method("fork")
 
@@ -43,7 +58,7 @@ class Simulation(Experiment):
 
         self.generations = str_to_int(self.simulation_config["Generations"])
         self.plot_point = self.generations // int(self.simulation_config["Plot points"])
-        print(f"Simulation over {self.generations} generations with {self.plot_point} plot points")
+        print(f"Simulation over {self.generations} generations with {self.generations // self.plot_point} plot points")
 
         mutation_types = self.mutations_config["Mutation types"]
 
@@ -75,7 +90,6 @@ class Simulation(Experiment):
             self.genomes = np.empty(self.population, dtype=Genome)
             self.init_population()
             print("Population created")
-        print(f"Population size: {(self.genomes.size * self.genomes.itemsize) // 1e3} ko")
 
         # Vectorize the clone method to apply it efficiently to the whole population. 
         # https://numpy.org/doc/stable/reference/generated/numpy.vectorize.html
@@ -132,75 +146,74 @@ class Simulation(Experiment):
             Genome: The child genome.
         """
         return parent.clone()
+
+    def profile_generation_step(self, genomes_changed, genomes_lengths, biases_genomes, total_bases_number):
+        genomes_changed, genomes_lengths, biases_genomes, total_bases_number = self.generation_step_parallel(1, genomes_changed, genomes_lengths, biases_genomes, total_bases_number)
+        cprofiler = profile.Profile()
+        print("Profiling generation_step")
+        cprofiler.runcall(self.generation_step_parallel, 2, genomes_changed, genomes_lengths, biases_genomes, total_bases_number)
+        cprofiler.print_stats(sort="cumtime")
     
     def mutation_is_deleterious(self, 
                                 mutation_event: Mutation, 
-                                genome_index: int, 
-                                structure_change_genome: sct.SynchronizedArray | set[int], 
-                                parallel: bool=False
+                                genome_index: int,
                                 ) -> bool:
-        """Checks wether or not mutation_event is deleterious for the genome at genome_index. 
-        If it isn't, applies the mutation and updates the structure_change_genome.
-
-        Args:
-            mutation_event (Mutation): The mutation event.
-            genome_index (int): The index of the genome in self.genomes.
-            structure_change_genome (sct.SynchronizedArray | set[int]): The list or set of genomes that changed their structure. Its type depends on the execution mode (parallel [SynchronizedArray] or not [set]).
-            parallel (bool, optional): To handle the difference of type of structure_change_genome. Defaults to False.
-
-        Returns:
-            bool: True if mutation_event is deleterious
-        """
         mutation_event.genome = self.genomes[genome_index]
 
         if mutation_event.is_neutral():
             mutation_event.apply()
-            if parallel:
-                for index in range(len(structure_change_genome)):
-                    if structure_change_genome[index] == -1:
-                        break
-                structure_change_genome[index] = genome_index
-            else:
-                # the mutation changed the structure of the genome.
-                structure_change_genome.add(genome_index)
             return False
-            
         return True
     
-    def process_chunk(self, 
-                      genome_indices: list[int], 
-                      mutation_events: list[Mutation], 
-                      living_genomes: sct.SynchronizedArray, 
-                      structure_change_genome: sct.SynchronizedArray
-                      ) -> None:
-        """Process a chunk of mutation events.
+    def mutation_is_deleterious_parallel(self,
+                                         mutation_event: Mutation, 
+                                        genome_index: int,
+                                        ) -> bool:
+        mutation_event.genome = self.genomes[genome_index]
 
-        Args:
-            genome_indices (list[int]): The indices of the genomes affected by the mutation events.
-            mutation_events (list[Mutation]): The mutation events.
-            living_genomes (sct.SynchronizedArray): The shared array that stores the living status of the genomes.
-            structure_change_genome (sct.SynchronizedArray): The shared array that stores the genomes that changed their structure.
-        """
-        for genome_index, mutation_event in zip(genome_indices, mutation_events):
-            if living_genomes[genome_index] and self.mutation_is_deleterious(mutation_event, genome_index, structure_change_genome, parallel=True):
-                living_genomes[genome_index] = 0
+        if mutation_event.is_neutral():
+            mutation_event.apply()
+            return False
+        return True
+                                         
     
+    def process_chunk(self, 
+                      mutation_events: list[Mutation],
+                      genome_indices: list[int],
+                      living_genomes: npt.NDArray[np.bool_],
+                      dead_genomes_queue: mp.Queue,
+                      genomes_changed_queue: mp.Queue,
+                      process_queue: mp.Queue,
+                      ) -> None:
+        living_genomes_indices = living_genomes.copy()
+        genomes_changed = set()
+        # start = perf_counter()
+        for mutation_event, genome_index in zip(mutation_events, genome_indices):
+            if living_genomes[genome_index]:
+                if self.mutation_is_deleterious_parallel(mutation_event, genome_index):
+                    living_genomes_indices[genome_index] = False
+                else:
+                    genomes_changed.add(genome_index)
+        # end = perf_counter()
+        # print(f"Process {mp.current_process().name} - Elapsed time: {end - start} s - {len(genome_indices)/ (end - start)} genomes/s")    
+
+        dead_genomes_queue.put(living_genomes_indices)
+        genomes_changed_queue.put(genomes_changed)
+        process_queue.put("DONE")
+    
+
     def generation_step_parallel(self,
                                  generation: int,
                                  genomes_changed: set[int],
                                  genomes_lengths: npt.NDArray[np.int_],
                                  biases_genomes: npt.NDArray[np.float_],
                                  total_bases_number: int
-                                 ) -> tuple[set[int], npt.NDArray[np.int_], npt.NDArray[np.float_], int]:
-        
-        if generation % self.plot_point == 0:
-            print(f"Generation {generation} / {self.generations}")
-        
+                                 ) -> tuple[set[int], npt.NDArray[np.int_], npt.NDArray[np.float_], int]:   
         # All individuals are alive at the beginning of a generation step.
-        living_genomes = mp.Array('I', [1] * len(self.genomes))
+        living_genomes = np.ones(self.population, dtype=bool)
 
-        # list that will store all the genomes affected by a neutral deletion that changed their structure. 
-        structure_change_genome = mp.Array("i", [-1] * len(self.genomes))
+        # list that will store all the genomes affected by a neutral deletion that changed their structure.
+        structure_change_genome = set()
         
         # The lengths are only computed for genomes that were changed by a mutation.
         delta = 0
@@ -208,6 +221,7 @@ class Simulation(Experiment):
             new_length = self.genomes[genome_changed].length
             delta += new_length - genomes_lengths[genome_changed]
             genomes_lengths[genome_changed] = new_length
+        del genomes_changed
 
         total_bases_number += delta
 
@@ -221,12 +235,15 @@ class Simulation(Experiment):
         mutation_events = np.random.choice(self.mutations, size=mutation_number, p=self.biases_mutation)
 
         # Determine whiwh genomes are affected with a biased (over the genome length) choice with replacement.
-        mutant_genomes = np.random.choice(range(len(self.genomes)), size=mutation_number, p=biases_genomes)
-
+        mutant_genomes = np.random.choice(range(self.population), size=mutation_number, p=biases_genomes)
+        # print(f"Mutation number: {mutation_number}")
         # Parallel computation
-        processes = []
         chunk_size = mutation_number // self.num_workers
-        print(f"chunk_size: {chunk_size}")
+        dead_genomes_queue = mp.Queue()
+        genome_changed_queue = mp.Queue()
+        process_queue = mp.Queue()
+
+        processes = []
         for process_index in range(self.num_workers):
             start = process_index * chunk_size
 
@@ -236,43 +253,59 @@ class Simulation(Experiment):
                 stop = (process_index + 1) * chunk_size
 
             process = mp.Process(target=self.process_chunk, 
-                                 args=(mutant_genomes[start:stop],
-                                       mutation_events[start:stop],
-                                       living_genomes, 
-                                       structure_change_genome
+                                 args=(mutation_events[start:stop],
+                                       mutant_genomes[start:stop],
+                                       living_genomes,
+                                       dead_genomes_queue,
+                                       genome_changed_queue,
+                                       process_queue
                                       )
                                 )
-            process.start()
             processes.append(process)
+            process.start()
+        del mutation_events
+        del mutant_genomes
+
+        counter = 0
+        while counter < self.num_workers:
+            if not process_queue.empty():
+                process_queue.get()
+                counter += 1
         
+        dead_genomes_queue_size = dead_genomes_queue.qsize()
+        for _ in range(dead_genomes_queue_size):
+            dead_genomes_indices = ~dead_genomes_queue.get()
+            living_genomes[dead_genomes_indices] = False
+        del dead_genomes_indices
+
+        genomes_changed_queue_size = genome_changed_queue.qsize()
+        for _ in range(genomes_changed_queue_size):
+            changed_genomes = genome_changed_queue.get()
+            structure_change_genome.update(changed_genomes)
+        del changed_genomes
+
         for process in processes:
-            start = perf_counter()
             process.join()
-            print(f"Process {process.pid} joined after waiting {perf_counter() - start} s")
 
-        living_genomes_np = np.frombuffer(living_genomes.get_obj(), dtype=np.int32)
-        structure_change_genome_np = set(np.frombuffer(structure_change_genome.get_obj(), dtype=np.int32))
-        structure_change_genome_np.remove(-1)
-
-        if not living_genomes_np.any():
+        if not living_genomes.any():
             raise RuntimeError(f"Generation {generation} - All individuals are dead.\n"
                                f"Last checkpoint at generation: {generation - ((generation - 1) % self.plot_point)}")
 
-        if generation % self.plot_point == 0:
-            if generation == 0:
+        if generation % self.plot_point == 0 or generation == 1:
+            if generation == 1:
                 for genome in self.genomes:
                     genome.compute_stats()
             else:
                 # Statistics only needs to be compute if structure has changed.
-                for genome_index in structure_change_genome_np:
+                for genome_index in structure_change_genome:
                     self.genomes[genome_index].compute_stats()
 
-            genomes_stats = [genome.stats.d_stats for genome in self.genomes[living_genomes_np]]
+            genomes_stats = [genome.stats.d_stats for genome in self.genomes[living_genomes]]
 
-            living_percentage = living_genomes_np.sum() / len(self.genomes) * 100
+            living_percentage = living_genomes.sum() / self.population * 100
 
             # TODO: Maybe possible to optimize but must be careful here: both structure change genome and dead genome affects the statistics.
-            z_nc_list = sorted([genome.z_nc for genome in self.genomes[living_genomes_np]])
+            z_nc_list = sorted([genome.z_nc for genome in self.genomes[living_genomes]])
             z_nc_min = z_nc_list[0]
             z_nc_max = z_nc_list[-1]
             z_nc_median = z_nc_list[len(z_nc_list) // 2]
@@ -287,19 +320,30 @@ class Simulation(Experiment):
             graphics.save_checkpoint(self.save_path, genomes_stats, population_stats, generation)
         
         # Wright-Fisher model: random draw with replacement of individuals. Population size is constant.
-        parents_indices = rd.choices(range(len(self.genomes[living_genomes_np])), k=len(self.genomes))
+        parents_indices = rd.choices(range(len(self.genomes[living_genomes])), k=self.population)
 
         # Create the set to map the parents with a structure change to their son (if any)
         next_generation_structure_change = set()
         for son_index, parent_index in enumerate(parents_indices):
-            if parent_index in structure_change_genome_np:
+            if parent_index in structure_change_genome:
                 next_generation_structure_change.add(son_index)
+        del structure_change_genome
+        
+        ####
+        # for name, size in sorted(((name, sys.getsizeof(value)) 
+        #                           for name, value in list(locals().items())),
+        #                           key= lambda x: -x[1])[:]:
+        #     print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
+        # print('\n\n')
+        # for name, size in sorted(((name, sys.getsizeof(value)) 
+        #                           for name, value in list(globals().items())),
+        #                           key= lambda x: -x[1])[:]:
+        #     print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
         
         # As several individuals maybe clones, must ensure every instance is independant, a copy.
-        self.genomes = self.vec_clone(self.genomes[living_genomes_np][parents_indices])
+        self.genomes = self.vec_clone(self.genomes[living_genomes][parents_indices])
      
         return (next_generation_structure_change, genomes_lengths, biases_genomes, total_bases_number)
-
     
     
 
@@ -335,20 +379,26 @@ class Simulation(Experiment):
         mutation_events = np.random.choice(self.mutations, size=mutation_number, p=self.biases_mutation)
 
         # Determine whiwh genomes are affected with a biased (over the genome length) choice with replacement.
-        mutant_genomes = np.random.choice(range(len(self.genomes)), size=mutation_number, p=biases_genomes)
+        mutant_genomes = np.random.choice(range(self.population), size=mutation_number, p=biases_genomes)
 
         # The first mutation that was drawn affects the first genome that was drawn...
         # As both are random, it doesn't introduce bias.
+        # start = perf_counter()
         for mutation_event, genome_index in zip(mutation_events, mutant_genomes):
-            if living_genomes[genome_index] and self.mutation_is_deleterious(mutation_event, genome_index, structure_change_genome):
+            if living_genomes[genome_index] and self.mutation_is_deleterious(mutation_event, genome_index):
                 living_genomes[genome_index] = False
-    
+            else:
+                # the mutation changed the structure of the genome.
+                structure_change_genome.add(genome_index)
+        # end = perf_counter()
+        # print(f"Process {mp.current_process().name} - Elapsed time: {end - start} s - {len(mutant_genomes)/ (end - start)} genomes/s")    
+
         if not living_genomes.any():
             raise RuntimeError(f"Generation {generation} - All individuals are dead.\n"
                             f"Last checkpoint at generation: {generation - ((generation - 1) % self.plot_point)}")
 
-        if generation % self.plot_point == 0:
-            if generation == 0:
+        if generation % self.plot_point == 0 or generation == 1:
+            if generation == 1:
                 for genome in self.genomes:
                     genome.compute_stats()
             else:
@@ -358,7 +408,7 @@ class Simulation(Experiment):
         
             genomes_stats = [genome.stats.d_stats for genome in self.genomes[living_genomes]]
 
-            living_percentage = living_genomes.sum() / len(self.genomes) * 100
+            living_percentage = living_genomes.sum() / self.population * 100
 
             # TODO: Maybe possible to optimize but must be careful here: both structure change genome and dead genome affects the statistics.
             z_nc_list = sorted([genome.z_nc for genome in self.genomes[living_genomes]])
@@ -377,52 +427,75 @@ class Simulation(Experiment):
 
         
         # Wright-Fisher model: random draw with replacement of individuals. Population size is constant.
-        parents_indices = rd.choices(range(len(self.genomes[living_genomes])), k=len(self.genomes))
+        parents_indices = rd.choices(range(len(self.genomes[living_genomes])), k=self.population)
 
         # Create the set to map the parents with a structure change to their son (if any)
         next_generation_structure_change = set()
         for son_index, parent_index in enumerate(parents_indices):
             if parent_index in structure_change_genome:
                 next_generation_structure_change.add(son_index)
-        
         # As several individuals maybe clones, must ensure every instance is independant, a copy.
         self.genomes = self.vec_clone(self.genomes[living_genomes][parents_indices])
-        
+
         return (next_generation_structure_change, genomes_lengths, biases_genomes, total_bases_number)
         
 
-
     def run(self, only_plot: bool=False, multiprocessing: bool=False):
         if not only_plot:
-
             genomes_changed = {genome_index for genome_index, _ in enumerate(self.genomes)}
             genomes_lengths = np.array([genome.length for genome in self.genomes])
             total_bases_number = genomes_lengths.sum()
             biases_genomes = np.array([genome_length / total_bases_number for genome_length in genomes_lengths])
-
+            first_gen_not_passed = True
             time_perfs = []
-            for generation in range(self.generations):
-                if multiprocessing:
-                    start_time = perf_counter()
-                    genomes_changed, genomes_lengths, biases_genomes, total_bases_number = self.generation_step_parallel(generation,
-                                                                                                                         genomes_changed,
-                                                                                                                         genomes_lengths,
-                                                                                                                         biases_genomes,
-                                                                                                                         total_bases_number)
-                    end_time = perf_counter()
+            sum_time_perfs = 0
+            # if PROFILE:
+            #     self.profile_generation_step(genomes_changed, genomes_lengths, biases_genomes, total_bases_number)
+            #     return None
+            for generation in range(1, self.generations + 1):
+                # print("HOP")
+                # for name, size in sorted(((name, sys.getsizeof(value)) 
+                #                 for name, value in list(locals().items())),
+                #                 key= lambda x: -x[1])[:]:
+                #     print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
+                # print('\n\n')
+                # for name, size in sorted(((name, sys.getsizeof(value)) 
+                #                         for name, value in list(globals().items())),
+                #                         key= lambda x: -x[1])[:]:
+                #     print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
+                # print("LA")
+                # if multiprocessing:
+                #     start_time = perf_counter()
+                #     genomes_changed, genomes_lengths, biases_genomes, total_bases_number = self.generation_step_parallel(generation,
+                #                                                                                                          genomes_changed,
+                #                                                                                                          genomes_lengths,
+                #                                                                                                          biases_genomes,
+                #                                                                                                          total_bases_number)
+                #     end_time = perf_counter()
 
-                else:
-                    start_time = perf_counter()
-                    genomes_changed, genomes_lengths, biases_genomes, total_bases_number = self.generation_step(generation, 
-                                                                                                                genomes_changed, 
-                                                                                                                genomes_lengths, 
-                                                                                                                biases_genomes, 
-                                                                                                                total_bases_number)
-                    end_time = perf_counter()
-                    
+                # else:
+                start_time = perf_counter()
+                genomes_changed, genomes_lengths, biases_genomes, total_bases_number = self.generation_step(generation, 
+                                                                                                            genomes_changed, 
+                                                                                                            genomes_lengths, 
+                                                                                                            biases_genomes, 
+                                                                                                            total_bases_number)
+                end_time = perf_counter()
                 time_perfs.append(end_time - start_time)
                 if generation % self.plot_point == 0:
-                    print(f"Generation {generation} - Mean elapsed time by generation: {sum(time_perfs) / len(time_perfs)} s")
+                    if first_gen_not_passed:
+                        # the first gen is longer than the others because of the compute_stats() method applied to all genomes.
+                        time_perfs = time_perfs[1:]
+                        first_gen_not_passed = False
+                    
+                    sum_over_last_gens = sum(time_perfs)
+                    average_time_perf_over_last_gens = sum_over_last_gens / len(time_perfs)
+                    sum_time_perfs += sum_over_last_gens
+                    print(f"Generation {generation}"
+                          f" - Mean elapsed time by generation: {sum_time_perfs / (generation - 1)} s"
+                          f" - Last {len(time_perfs)} generations: {average_time_perf_over_last_gens} s")
+                    time_perfs = []
+                    
             print(f"Generation {generation} - End of simulation")
 
         self.plot_simulation()
@@ -448,6 +521,8 @@ class Simulation(Experiment):
 
         
         for index, x in enumerate(x_value):
+            if x == 0:
+                x = 1
             with open(self.save_path / f"generation_{x}.json", "r", encoding="utf8") as json_file:
                 stats = json.load(json_file)
             
@@ -493,3 +568,9 @@ class Simulation(Experiment):
 
     
 
+def sizeof_fmt(num, suffix='B'):
+    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f %s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f %s%s" % (num, 'Yi', suffix)
