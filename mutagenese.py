@@ -29,6 +29,9 @@ class Mutagenese(Experiment):
         self.experiment_repetitions = str_to_int(self.mutagenese_config["Iterations"])
 
         self.results = {mutation: {} for mutation in self.mutation_names}
+    
+    def save_population(self, filename: str):
+        pass
 
     def run(self, only_plot: bool=False, multiprocessing: bool=False):
         if not only_plot:

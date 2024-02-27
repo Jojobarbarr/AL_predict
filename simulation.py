@@ -1,51 +1,92 @@
+import json
+import multiprocessing as mp
+import multiprocessing.sharedctypes as sct
+import pickle as pkl
 import random as rd
 from configparser import ConfigParser
+from pathlib import Path
+from time import perf_counter
 
 import numpy as np
 import numpy.typing as npt
-import multiprocessing as mp
-import json
-from time import perf_counter
+
+import graphics
 from experiment import Experiment
 from genome import Genome
 from mutations import Mutation
-import graphics
 from utils import MUTATIONS, str_to_int
 
 
 class Simulation(Experiment):
-    def __init__(self, config: ConfigParser):
+    def __init__(self, config: ConfigParser, load_file: Path=Path("")) -> None:
+        """Simulation initialization.
+
+        Args:
+            config (ConfigParser): configuration.
+            load_file (Path, optional): If provided, the population is loaded (quickier than creating it). Defaults to Path("").
+
+        Raises:
+            FileNotFoundError: If the file to load the population is not found, an exception is raised and execution stops.
+        """
+        init_start = perf_counter()
         super().__init__(config)
 
+        ## Multiprocessing initialization
+        # TODO: Fine tune the number of workers.
         self.num_workers = min(mp.cpu_count(), 32)
-        self.num_workers = 4
+        self.num_workers = 2
+
         mp.set_start_method("fork")
 
+        ## Simulation initialization
         print("Initializing simulation")
 
         self.generations = str_to_int(self.simulation_config["Generations"])
         self.plot_point = self.generations // int(self.simulation_config["Plot points"])
+        print(f"Simulation over {self.generations} generations with {self.plot_point} plot points")
 
         mutation_types = self.mutations_config["Mutation types"]
+
         # Mutation rates
         self.mutation_rates = np.array([float(self.mutation_rates_config[f"{mutation_type} rate"]) 
-                                        for mutation_type in mutation_types])
+                                        for mutation_type in mutation_types], dtype=np.float64)
         self.total_mutation_rate = sum(self.mutation_rates)
         self.biases_mutation = self.mutation_rates / self.total_mutation_rate
 
         # Mutations
         l_m = int(self.mutations_config["l_m"])
         self.mutations = np.array([MUTATIONS[mutation_type](self.mutation_rates[mutation_index], genome=None, l_m=l_m)
-                                   for mutation_index, mutation_type in enumerate(mutation_types)])
+                                   for mutation_index, mutation_type in enumerate(mutation_types)], dtype=Mutation)
         
+        # Population
         self.population = str_to_int(self.simulation_config["Population size"])
-        self.genomes = np.empty(self.population, dtype=Genome)
-        self.init_population()
 
+        # Load or create the population
+        if load_file != Path(""):
+            try:
+                print(f"Loading population {load_file}")
+                with open(load_file, "rb") as pkl_file:
+                    self.genomes = pkl.load(pkl_file)
+                print(f"Population {load_file} loaded")
+            except FileNotFoundError:
+                raise FileNotFoundError(f"File {load_file} not found. Please provide a valid file.")
+        else:
+            print("Creating population")
+            self.genomes = np.empty(self.population, dtype=Genome)
+            self.init_population()
+            print("Population created")
         print(f"Population size: {(self.genomes.size * self.genomes.itemsize) // 1e3} ko")
-        print("Simulation initialized")
+
+        # Vectorize the clone method to apply it efficiently to the whole population. 
+        # https://numpy.org/doc/stable/reference/generated/numpy.vectorize.html
+        self.vec_clone = np.vectorize(self.clone)
+
+        init_end = perf_counter()
+        print(f"Simulation initialized in {init_end - init_start} s")
 
     def init_population(self):
+        """Create the population of genomes.
+        """
         homogeneous = self.genome_config["Homogeneous"]
         orientation = self.genome_config["Orientation"]
 
@@ -68,8 +109,48 @@ class Simulation(Experiment):
         for individual in range(self.population):
             self.genomes[individual] = Genome(g, z_c, z_nc, homogeneous, orientation) # type: ignore TODO: optim?
     
+    def save_population(self, file: str):
+        """Save the population in a pickle file.
+
+        Args:
+            file (str): pickle file name saved in self.save_path / "populations"
+        """
+        save_dir = self.save_path / "populations"
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        with open(save_dir / file, "wb") as pkl_file:
+            pkl.dump(self.genomes, pkl_file, protocol=pkl.HIGHEST_PROTOCOL)
+        print("Population saved")
     
-    def mutation_is_deleterious(self, mutation_event: Mutation, genome_index: int, structure_change_genome, parallel: bool=False) -> bool:
+    def clone(self, parent: Genome) -> Genome:
+        """Clones the parent genome as a deep copy. This function is used through self.vec_clone, its vectorized equivalent.
+
+        Args:
+            parent (Genome): The parent genome.
+
+        Returns:
+            Genome: The child genome.
+        """
+        return parent.clone()
+    
+    def mutation_is_deleterious(self, 
+                                mutation_event: Mutation, 
+                                genome_index: int, 
+                                structure_change_genome: sct.SynchronizedArray | set[int], 
+                                parallel: bool=False
+                                ) -> bool:
+        """Checks wether or not mutation_event is deleterious for the genome at genome_index. 
+        If it isn't, applies the mutation and updates the structure_change_genome.
+
+        Args:
+            mutation_event (Mutation): The mutation event.
+            genome_index (int): The index of the genome in self.genomes.
+            structure_change_genome (sct.SynchronizedArray | set[int]): The list or set of genomes that changed their structure. Its type depends on the execution mode (parallel [SynchronizedArray] or not [set]).
+            parallel (bool, optional): To handle the difference of type of structure_change_genome. Defaults to False.
+
+        Returns:
+            bool: True if mutation_event is deleterious
+        """
         mutation_event.genome = self.genomes[genome_index]
 
         if mutation_event.is_neutral():
@@ -86,7 +167,20 @@ class Simulation(Experiment):
             
         return True
     
-    def parallel_test(self, genome_indices: list[int], mutation_events: list[Mutation], living_genomes, structure_change_genome):
+    def process_chunk(self, 
+                      genome_indices: list[int], 
+                      mutation_events: list[Mutation], 
+                      living_genomes: sct.SynchronizedArray, 
+                      structure_change_genome: sct.SynchronizedArray
+                      ) -> None:
+        """Process a chunk of mutation events.
+
+        Args:
+            genome_indices (list[int]): The indices of the genomes affected by the mutation events.
+            mutation_events (list[Mutation]): The mutation events.
+            living_genomes (sct.SynchronizedArray): The shared array that stores the living status of the genomes.
+            structure_change_genome (sct.SynchronizedArray): The shared array that stores the genomes that changed their structure.
+        """
         for genome_index, mutation_event in zip(genome_indices, mutation_events):
             if living_genomes[genome_index] and self.mutation_is_deleterious(mutation_event, genome_index, structure_change_genome, parallel=True):
                 living_genomes[genome_index] = 0
@@ -131,7 +225,8 @@ class Simulation(Experiment):
 
         # Parallel computation
         processes = []
-        chunk_size = mutation_number // mp.cpu_count()
+        chunk_size = mutation_number // self.num_workers
+        print(f"chunk_size: {chunk_size}")
         for process_index in range(self.num_workers):
             start = process_index * chunk_size
 
@@ -140,7 +235,7 @@ class Simulation(Experiment):
             else:
                 stop = (process_index + 1) * chunk_size
 
-            process = mp.Process(target=self.parallel_test, 
+            process = mp.Process(target=self.process_chunk, 
                                  args=(mutant_genomes[start:stop],
                                        mutation_events[start:stop],
                                        living_genomes, 
@@ -151,7 +246,9 @@ class Simulation(Experiment):
             processes.append(process)
         
         for process in processes:
+            start = perf_counter()
             process.join()
+            print(f"Process {process.pid} joined after waiting {perf_counter() - start} s")
 
         living_genomes_np = np.frombuffer(living_genomes.get_obj(), dtype=np.int32)
         structure_change_genome_np = set(np.frombuffer(structure_change_genome.get_obj(), dtype=np.int32))
@@ -169,7 +266,7 @@ class Simulation(Experiment):
                 # Statistics only needs to be compute if structure has changed.
                 for genome_index in structure_change_genome_np:
                     self.genomes[genome_index].compute_stats()
-            
+
             genomes_stats = [genome.stats.d_stats for genome in self.genomes[living_genomes_np]]
 
             living_percentage = living_genomes_np.sum() / len(self.genomes) * 100
@@ -188,6 +285,7 @@ class Simulation(Experiment):
             }
 
             graphics.save_checkpoint(self.save_path, genomes_stats, population_stats, generation)
+        
         # Wright-Fisher model: random draw with replacement of individuals. Population size is constant.
         parents_indices = rd.choices(range(len(self.genomes[living_genomes_np])), k=len(self.genomes))
 
@@ -196,10 +294,14 @@ class Simulation(Experiment):
         for son_index, parent_index in enumerate(parents_indices):
             if parent_index in structure_change_genome_np:
                 next_generation_structure_change.add(son_index)
-        # As several individuals maybe clones, must ensure every instance is independant, a copy.
-        self.genomes = np.array([self.genomes[living_genomes_np][parent_index].clone() for parent_index in parents_indices], dtype=Genome)
         
+        # As several individuals maybe clones, must ensure every instance is independant, a copy.
+        self.genomes = self.vec_clone(self.genomes[living_genomes_np][parents_indices])
+     
         return (next_generation_structure_change, genomes_lengths, biases_genomes, total_bases_number)
+
+    
+    
 
     def generation_step(self, 
                         generation: int, 
@@ -284,8 +386,8 @@ class Simulation(Experiment):
                 next_generation_structure_change.add(son_index)
         
         # As several individuals maybe clones, must ensure every instance is independant, a copy.
-        self.genomes = np.array([self.genomes[living_genomes][parent_index].clone() for parent_index in parents_indices], dtype=Genome)
-
+        self.genomes = self.vec_clone(self.genomes[living_genomes][parents_indices])
+        
         return (next_generation_structure_change, genomes_lengths, biases_genomes, total_bases_number)
         
 
