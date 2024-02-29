@@ -2,7 +2,6 @@ import random as rd
 
 import numpy as np
 import numpy.typing as npt
-
 from stats import GenomeStatistics
 
 
@@ -39,6 +38,7 @@ class Genome:
         self.loci, self.orientation_list, self.genome = self.init_genome()
         self.loci_interval = np.empty(self.g)
         self.update_features()
+    
         
 
     def __str__(self) -> str:
@@ -79,28 +79,28 @@ class Genome:
         """Create a random genome respecting the constraints given by the user.
         """
         if self.orientation:
-            orientation = np.array([1 for _ in range(self.g)])
+            orientation = np.array([1 for _ in range(self.g)], dtype=np.int_)
         else:
-            orientation = np.array([rd.choice([1, -1]) for _ in range(self.g)])
+            orientation = np.array([rd.choice([1, -1]) for _ in range(self.g)], dtype=np.int_)
         if not self.DEBUG:
             if not self.homogeneous:
                 # To create non homogeneous genome, we start from a non coding genome. 
                 # g random locus of insertion are selected, and the genes are inserted.
                 loci_of_insertion = sorted(rd.sample(range(0, self.z_nc), self.g))
-                loci = np.array([locus + (segment * self.gene_length) + 1 for segment, locus in enumerate(loci_of_insertion)])
+                loci = np.array([locus + (segment * self.gene_length) + 1 for segment, locus in enumerate(loci_of_insertion)], dtype=np.int_)
                 return loci, orientation, np.empty(1)
             
             # To create homogeneous genome, promoters are regularly disposed.
             distance_between_promoters = self.gene_length + (self.z_nc // self.g)
-            loci = np.array([promoter * distance_between_promoters for promoter in range(self.g)])
+            loci = np.array([promoter * distance_between_promoters for promoter in range(self.g)], dtype=np.int_)
             return loci, orientation, np.empty(1)
 
         ## Only executed in DEBUG mode
         if not self.homogeneous:
             loci_of_insertion = sorted(rd.sample(range(0, self.z_nc), self.g))
-            loci = np.array([promoter + (segment * self.gene_length) + 1 for segment, promoter in enumerate(loci_of_insertion)])
+            loci = np.array([promoter + (segment * self.gene_length) + 1 for segment, promoter in enumerate(loci_of_insertion)], dtype=np.int_)
         else:
-            loci = np.array([promoter * (self.gene_length + (self.z_nc // self.g)) for promoter in range(self.g)])
+            loci = np.array([promoter * (self.gene_length + (self.z_nc // self.g)) for promoter in range(self.g)], dtype=np.int_)
             print(loci)
         genome = self.update_genome(loci)
 
@@ -109,8 +109,11 @@ class Genome:
     def compute_intervals(self):
         """Compute the intervals between the promoters.
         """
-        self.loci_interval = np.array([self.loci[i] - self.loci[i-1] for i in range(1, len(self.loci))])
+        nc_at_junction = self.length + self.loci[0] - self.loci[-1] - self.gene_length
+        self.loci_interval = np.array([self.loci[i] - self.loci[i-1] - self.gene_length for i in range(1, len(self.loci))] + [nc_at_junction], dtype=np.int_)
     
+    
+
     def set_genome(self, z_c: int, z_nc: int, g: int, loci: npt.NDArray[np.int_], genome: npt.NDArray[np.int_], orientation: npt.NDArray[np.int_]=np.array([])):
         """Set manually an explicit genome. For DEBUG only.
 
@@ -235,11 +238,26 @@ class Genome:
         if self.DEBUG:
             self.genome = self.update_genome(self.loci)
     
-    def update_features(self):
+    def blend(self):
+        nc_lengths = self.z_nc // self.g
+        remaining_nc = self.z_nc % self.g
+        distance_between_promoters = self.gene_length + nc_lengths
+        self.loci_interval = np.array([distance_between_promoters for _ in range(self.g)], dtype=np.int_)
+        remaining_insertions = rd.sample(range(0, self.g - 1), remaining_nc)
+        self.loci_interval[remaining_insertions] += 1
+
+        self.loci = np.cumsum(self.loci_interval)
+        self.loci = np.concatenate(([0], self.loci[:-1]))
+        self.orientation = np.array([1 for _ in range(self.g)], dtype=np.int_)
+        self.update_features()
+        return self
+
+    def update_features(self, skip_intervals: bool=False):
         """Compute some genome charasteristics from global attributes.
         """
         self.length = self.z_c + self.z_nc
-        self.compute_intervals()
+        if not skip_intervals:
+            self.compute_intervals()
         self.max_length_neutral = self.loci_interval.min()
         distance = self.length - self.loci[-1] + self.loci[0]
         if distance < self.max_length_neutral:

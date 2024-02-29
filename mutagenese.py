@@ -33,7 +33,7 @@ class Mutagenese(Experiment):
     def save_population(self, filename: str):
         pass
 
-    def run(self, only_plot: bool=False, multiprocessing: bool=False):
+    def run(self, only_plot: bool=False, multiprocessing: bool=False, skip_generation_plots: bool=False):
         if not only_plot:
             if self.variable == "No variable":
                 genome = self.prepare_mutagenese(0)
