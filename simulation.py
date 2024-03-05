@@ -45,7 +45,9 @@ class Simulation(Experiment):
 
         self.init_mutations()
         
-        self.init_genomes(load_file)
+        if self.checkpoints_path == Path(""):
+            self.init_genomes(load_file)
+
         
         # Vectorize the clone method to apply it efficiently to the whole population. 
         # https://numpy.org/doc/stable/reference/generated/numpy.vectorize.html
@@ -76,7 +78,7 @@ class Simulation(Experiment):
         self.mutations = np.array([MUTATIONS[mutation_type](l_m=l_m) for mutation_type in mutation_types], dtype=Mutation)
 
     def init_genomes(self, load_file: Path):
-        self.blend = True # TODO: add blend to the config file
+        self.blend = self.simulation_config["Blend"]
 
         # Load or create the population
         if load_file != Path(""):
@@ -141,6 +143,9 @@ class Simulation(Experiment):
     
 
     def run(self, only_plot: bool=False, multiprocessing: bool=False, skip_generation_plots: bool=False):
+        if self.checkpoints_path == Path(""):
+            self.load_from_checkpoint(self.simulation_config["Generation Checkpoint"])
+
         if not only_plot:
             main_start_time = perf_counter()
             # Initialize the set of genomes to ensure every genome stats will be computed at the first generation.
@@ -148,6 +153,8 @@ class Simulation(Experiment):
             genomes_lengths = np.array([genome.length for genome in self.genomes], dtype=np.int32)
             total_bases_number = genomes_lengths.sum()
             biases_genomes = np.array([genome_length / total_bases_number for genome_length in genomes_lengths], np.float32)
+            for genome in self.genomes:
+                genome.compute_stats()
 
             # Flag to forget first generation in the time performance computation.
             first_gen_not_passed = True
@@ -181,12 +188,16 @@ class Simulation(Experiment):
                     generation_elapsed = len(time_perfs)
                     average_time_perf_over_last_gens = sum_over_last_generations / generation_elapsed
                     sum_time_perfs += sum_over_last_generations
+                    average_time_perf = sum_time_perfs / (generation - 1)
                     print(f"\nGeneration {generation}"
-                          f" - Mean elapsed time by generation: {sum_time_perfs / (generation - 1):.3f} s/generation"
+                          f" - Mean elapsed time by generation: {average_time_perf:.3f} s/generation"
                           f" - Last {generation_elapsed} generations: {average_time_perf_over_last_gens:.3f} s/generation")
                     print(f"{self.format_time(end_time - main_start_time)} elapsed since the beginning of the simulation "
-                          f"- \033[1mEstimated remaining time: {self.format_time(average_time_perf_over_last_gens * (self.generations - generation))}\033[0m")
+                          f"- \033[1mEstimated remaining time: {self.format_time(average_time_perf * (self.generations - generation))}\033[0m")
                     time_perfs = []
+                
+                if generation % self.checkpoint == 0:
+                    self.save_checkpoint(generation, genomes_changed, genomes_lengths, biases_genomes, total_bases_number)
                     
             print(f"Generation {generation} - End of simulation")
 
@@ -200,7 +211,8 @@ class Simulation(Experiment):
                         total_bases_number: int
                         ) -> tuple[npt.NDArray[np.bool_], npt.NDArray[np.int_], npt.NDArray[np.float_], int]:
         if generation % self.plot_point == 0 or generation == 1:
-            z_nc_array = np.array([genome.z_nc for genome in self.genomes], dtype=np.int_).sort()
+            z_nc_array = np.array([genome.z_nc for genome in self.genomes], dtype=np.int_)
+            z_nc_array.sort()
             genomes_stats = np.array([genome.stats.d_stats for genome in self.genomes], dtype=dict)
 
         # All individuals are alive at the beginning of a generation step.
@@ -229,26 +241,6 @@ class Simulation(Experiment):
             raise RuntimeError(f"Generation {generation} - All individuals are dead.\n"
                                f"Last checkpoint at generation: {generation - ((generation - 1) % self.plot_point)}")
 
-        if generation % self.plot_point == 0 or generation == 1:
-            if generation == 1:
-                for genome in self.genomes[living_genomes_mask]:
-                    genome.compute_stats()
-            else:
-                # Statistics only needs to be compute if structure has changed.
-                for genome in self.genomes[changed_genomes_mask]:
-                    genome.compute_stats()
-        
-            living_percentage = living_genomes_mask.sum() / self.population * 100
-            structure_changed_percentage = changed_genomes_mask.sum() / self.population * 100
-
-            population_stats = {
-                "Living percentage": living_percentage,
-                "Structure changed percentage": structure_changed_percentage,
-                "z_nc_array": z_nc_array
-            }
-
-            graphics.save_checkpoint(self.save_path / "logs", genomes_stats, population_stats, generation)
-
         # Wright-Fisher model: random draw with replacement of individuals. Population size is constant.
         parents_indices = rd.choices(range(len(self.genomes[living_genomes_mask])), k=self.population)
 
@@ -259,7 +251,23 @@ class Simulation(Experiment):
                 next_generation_structure_change_mask[son_index] = True
         
         if self.blend:
-            self.genomes[changed_genomes_mask] = self.vec_blend_genomes(self.genomes[changed_genomes_mask])
+            if changed_genomes_mask.any():
+                self.genomes[changed_genomes_mask] = self.vec_blend_genomes(self.genomes[changed_genomes_mask])
+
+        if generation % self.plot_point == 0 or generation == 1:
+            # Statistics only needs to be compute if structure has changed.
+            for genome in self.genomes[changed_genomes_mask]:
+                genome.compute_stats()
+        
+            living_percentage = living_genomes_mask.sum() / self.population * 100
+            structure_changed_percentage = changed_genomes_mask.sum() / self.population * 100
+
+            population_stats = {
+                "Living percentage": living_percentage,
+                "Structure changed percentage": structure_changed_percentage,
+                "z_nc_array": z_nc_array
+            }
+            graphics.save_checkpoint(self.save_path / "logs", genomes_stats, population_stats, generation)
 
         # As several individuals maybe clones, must ensure every instance is independant, a copy.
         self.genomes = self.vec_clone(self.genomes[living_genomes_mask][parents_indices])
@@ -310,10 +318,49 @@ class Simulation(Experiment):
     def format_time(self, time: float) -> str:
         if time < 60:
             return f"{time:.0f} s"
-        elif time < 3600:
+        if time < 3600:
             return f"{time // 60:.0f} min {time % 60:.0f} s"
-        else:
-            return f"{time // 3600:.0f} h {time % 3600:.0f} min"
+        if time < 86400:
+            return f"{time // 3600:.0f} h {(time % 3600) // 60:.0f} min"
+        return f"{time // 86400:.0f} j {(time % 86400) // 3600:.0f} h"
+    
+    def save_checkpoint(self, 
+                        generation: int, 
+                        genomes_changed: npt.NDArray[np.bool_], 
+                        genomes_lengths: npt.NDArray[np.int_], 
+                        biases_genomes: npt.NDArray[np.float_], 
+                        total_bases_number: int):
+        self.checkpoints_path.mkdir(parents=True, exist_ok=True)
+        to_dump = {
+            "self.genomes": self.genomes,
+            "genomes_changed": genomes_changed,
+            "genomes_lengths": genomes_lengths,
+            "biases_genomes": biases_genomes,
+            "total_bases_number": total_bases_number
+        }
+        with open(self.checkpoints_path / f"generation_{generation}.pkl", "wb") as pkl_file:
+            pkl.dump(to_dump, pkl_file, protocol=pkl.HIGHEST_PROTOCOL)
+        print()
+    
+    def load_from_checkpoint(self, generation) -> tuple[npt.NDArray[np.bool_], npt.NDArray[np.int_], npt.NDArray[np.float_], int]:
+        if generation < 0:
+            files = self.checkpoints_path.glob("*.pkl")
+            generation = max([int(file.stem.split("_")[1]) for file in files])
+        with open(self.checkpoints_path / f"generation_{generation}.pkl", "rb") as pkl_file:
+            loaded = pkl.load(pkl_file)
+        self.genomes = loaded["self.genomes"]
+        genomes_changed = loaded["genomes_changed"]
+        genomes_lengths = loaded["genomes_lengths"]
+        biases_genomes = loaded["biases_genomes"]
+        total_bases_number = loaded["total_bases_number"]
+        return (genomes_changed, genomes_lengths, biases_genomes, total_bases_number)
+
+    
+
+
+
+
+
 
     
     
@@ -523,7 +570,6 @@ class Simulation(Experiment):
                     stats = pkl.load(pkl_file)
                 
                 genome_raw_stats = stats["genome"]
-                print(genome_raw_stats)
                 population_raw_stats = stats["population"]
 
                 genomes_non_coding_proportion = np.array([genome["Non coding proportion"] for genome in genome_raw_stats], dtype=np.float32)
@@ -543,7 +589,7 @@ class Simulation(Experiment):
                 population_living_percentage = population_raw_stats["Living percentage"]
                 population_living_percentages[index] = population_living_percentage
 
-                population_z_nc = population_raw_stats["z_nc_list"]
+                population_z_nc = population_raw_stats["z_nc_array"]
                 graphics.plot_generation(population_z_nc, generation, 1e6 - 100, 1e6 + 100, 500, "Population z_nc", f"Population z_nc", self.save_path / "generation_plots")
                 population_z_ncs[index] = population_z_nc
 

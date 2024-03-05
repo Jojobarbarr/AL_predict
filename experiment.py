@@ -51,5 +51,8 @@ class Experiment:
         self.save_path = Path(config["Paths"]["Save directory"])
         self.checkpoints_path = Path(config["Paths"]["Checkpoint directory"])
 
+    def save_population(self, filename: str):
+        pass
+
 
 

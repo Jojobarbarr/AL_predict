@@ -6,16 +6,9 @@ from stats import MutationStatistics
 
 
 class Mutation:
-    def __init__(self, type: str, DEBUG: bool=False) -> None:
-        """
-
-        Args:
-            type (str): mutation type.
-            DEBUG (bool, optional): Flag to activate prints. Defaults to False.
-        """
-        self.type = type
+    def __init__(self, name: str, *args) -> None:
+        self.name = name
         self.stats = MutationStatistics()
-        self.DEBUG = DEBUG
 
         self.insertion_locus = 0
         self.starting_point = 0
@@ -25,38 +18,20 @@ class Mutation:
         self.l_m = 0
     
     def __str__(self) -> str:
-        """Print the type of the mutation.
-
-        Returns:
-            str: Type of the mutation.
-        """
-        return self.type
+        return self.name
     
-    def is_neutral(self, genome: Genome) -> bool:
+    def is_neutral(self, *args) -> bool:
         self.stats.count += 1
         return True
 
-    def apply(self, genome: Genome, virtually: bool=False, switched: bool=False):
+    def apply(self, genome: Genome, switched: bool=False, *args):
         self.stats.neutral_count += 1
         if switched:
             self.length = genome.length - self.length
         self.stats.length_sum += self.length
         self.stats.length_square_sum += self.length ** 2
-        
-
 
     def Bernoulli(self, p: float) -> bool:
-        """Perform a Bernoulli trial with parameter p, 0 <= p <= 1.
-
-        Args:
-            p (float): probability of success.
-
-        Raises:
-            ValueError: if p isn't in [0, 1].
-
-        Returns:
-            bool: the result of the Bernoulli trial.
-        """
         if p < 0 or p > 1:
             raise ValueError(f"p must be between 0 and 1. You provided p = {p}")
         
@@ -113,7 +88,7 @@ class Mutation:
         
         return False
     
-    def theory(self) -> tuple[float, float]:
+    def theory(self, genome: Genome) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
 
         Returns:
@@ -265,7 +240,7 @@ class Deletion(Mutation):
 
     def is_neutral(self, genome: Genome) -> bool:
         """Checks if mutation is neutral. Deletion is neutral if starting point is a non coding base AND length is less than distance to the next coding section.
-        This method first checks if starting point is a deleterious locus by conducting a Bernoulli trial with parameter p = self.genome.z_nc / self.genome.length.
+        This method first checks if starting point is a deleterious locus by conducting a Bernoulli trial with parameter p = genome.z_nc / genome.length.
         Then, checks if length is greater than the maximum non coding sequence.
         Then, checks if the ending point is deleterious.
 
@@ -652,7 +627,7 @@ class Inversion(Mutation):
             float: mutation neutrality probability
         """
         return (((genome.z_nc + genome.g) * (genome.z_nc + genome.g - 1)) / (genome.length * (genome.length - 1)),
-                genome.length)
+                genome.length / 2)
 
 
 
