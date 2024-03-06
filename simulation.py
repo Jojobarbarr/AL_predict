@@ -1,7 +1,5 @@
 from tqdm import tqdm
 import multiprocessing as mp
-# from memory_profiler import profile
-# import cProfile as profile
 import pickle as pkl
 import random as rd
 from configparser import ConfigParser
