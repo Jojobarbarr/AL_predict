@@ -6,4 +6,6 @@ bin/
 lib/
 lib64
 *.cfg
-results/
+results*/
+logs*/
+*.sh

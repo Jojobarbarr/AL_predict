@@ -8,7 +8,7 @@ import graphics
 import mutations
 from experiment import Experiment
 from genome import Genome
-from utils import MUTATIONS, str_to_bool, str_to_int
+from utils import MUTATIONS, str_to_int, L_M
 
 
 class Mutagenese(Experiment):
@@ -30,22 +30,30 @@ class Mutagenese(Experiment):
 
         self.results = {mutation: {} for mutation in self.mutation_names}
     
-    def save_population(self, filename: str):
-        pass
+    
 
-    def run(self, only_plot: bool=False, multiprocessing: bool=False):
+    def run(self, only_plot: bool=False, multiprocessing: bool=False, skip_generation_plots: bool=False):
         if not only_plot:
             if self.variable == "No variable":
                 genome = self.prepare_mutagenese(0)
                 for mutation, name in zip(self.mutation_types, self.mutation_names):
-                    self.results[name][888] = self.loop(mutation(1, genome, self.l_m))
+                    print(f"Mutation type: {name}")
+                    if name in L_M:
+                        self.results[name][888] = self.loop(mutation(self.l_m), genome)
+                    else:
+                        self.results[name][888] = self.loop(mutation(), genome)
                 del genome # genome can be very large
 
             else:
                 for power in range(self.power_min, self.power_max + 1, self.power_step):
+                    print(f"Experience for {self.variable} = 10^{power}")
                     genome = self.prepare_mutagenese(10 ** power)
                     for mutation, name in zip(self.mutation_types, self.mutation_names):
-                        self.results[name][power] = self.loop(mutation(1, genome, self.l_m))
+                        print(f"Mutation type: {name}")
+                        if name in L_M:
+                            self.results[name][power] = self.loop(mutation(self.l_m), genome)
+                        else:
+                            self.results[name][power] = self.loop(mutation(), genome)
                     del genome # genome can be very large
         
             graphics.save_stats(self.save_path, self.results)
@@ -79,19 +87,18 @@ class Mutagenese(Experiment):
 
         return Genome(g, z_c, z_nc, self.homogeneous, self.orientation) # type: ignore 
 
-    def loop(self, mutation: mutations.Mutation) -> dict[str, float]:
+    def loop(self, mutation: mutations.Mutation, genome: Genome) -> dict[str, float]:
         for _ in tqdm(range(self.experiment_repetitions), "Experiment progress... ", self.experiment_repetitions):
-            if mutation.is_neutral():
-                mutation.apply(virtually=True)
-
-        mutation.stats.compute(mutation.theory())
-
+            if mutation.is_neutral(genome):
+                mutation.apply(genome, virtually=True)
+        mutation.stats.compute(mutation.theory(genome))
         return mutation.stats.d_stats
+    
     
     def plot_mutagenese(self):
         x_value = [10 ** power for power in range(self.power_min, self.power_max + 1, self.power_step)]
         for mutation_type in self.mutation_names:
-            save_dir = self.save_path / mutation_type
+            save_dir = self.save_path / "stats" / mutation_type
 
             neutral_proportions = []
             neutral_stds =[]

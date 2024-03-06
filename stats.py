@@ -57,33 +57,21 @@ class MutationStatistics(Statistics):
 class GenomeStatistics(Statistics):
     def __init__(self) -> None:
         self.nc_proportion = 0
-        self.nc_min = 0
-        self.nc_max = 0
-        self.nc_median = 0
+        self.intervals_between_loci = np.empty(0)
         self.d_stats = {}
     
     def clone(self):
         clone = GenomeStatistics()
         clone.nc_proportion = self.nc_proportion
-        clone.nc_min = self.nc_min
-        clone.nc_max = self.nc_max
-        clone.nc_median = self.nc_median
+        clone.intervals_between_loci = self.intervals_between_loci.copy()
         clone.d_stats = self.d_stats
         return clone
         
     def compute(self, genome) -> None:
         self.nc_proportion = genome.z_nc / genome.length
-        intervals_between_loci = np.sort(genome.loci_interval)
-        self.extremum_between_indices(genome, intervals_between_loci)
-        self.nc_median = intervals_between_loci[len(intervals_between_loci) // 2]
+        self.intervals_between_loci = np.sort(genome.loci_interval)
         self.d_stats = {
             "Non coding proportion": self.nc_proportion,
-            "Non coding length min": int(self.nc_min),
-            "Non coding length max": int(self.nc_max),
-            "Non coding length median": int(self.nc_median),
+            "Non coding length list": self.intervals_between_loci,
         }
-        
-    def extremum_between_indices(self, genome, intervals_between_loci) -> int | None:
-        nc_at_junction = genome.length + genome.loci[0] - genome.loci[-1] - genome.gene_length
-        self.nc_min = min(intervals_between_loci[0], nc_at_junction)
-        self.nc_max = max(intervals_between_loci[-1], nc_at_junction)
+    
