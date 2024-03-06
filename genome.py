@@ -5,17 +5,24 @@ from stats import GenomeStatistics
 
 
 class Genome:
-    def __init__(self, g: int, z_c: int, z_nc: int, homogeneous: bool=False, orientation: bool=False):
+    def __init__(
+        self,
+        g: int,
+        z_c: int,
+        z_nc: int,
+        homogeneous: bool = False,
+        orientation: bool = False,
+    ):
         if g == 1 and z_c == 1 and z_nc == 1:
             # Dummy genome, no calculation will be done on it.
             return None
-        
+
         self.z_c = z_c
         self.z_nc = z_nc
         self.length = self.z_c + self.z_nc
 
         self.g = g
-        
+
         self.homogeneous = homogeneous
         self.orientation = orientation
 
@@ -25,19 +32,18 @@ class Genome:
         self.loci, self.orientation_list = self.init_genome()
         self.loci_interval = np.empty(self.g)
         self.update_features()
-    
-        
 
     def __str__(self) -> str:
-        return (f"\nGenome:\n"
-                f"g: {self.g}\n"
-                f"z_c: {self.z_c}\n"
-                f"z_nc: {self.z_nc}\n"
-                f"length: {self.length}\n"
-                f"homogeneous: {self.homogeneous}\n"
-                f"gene_length: {self.gene_length}\n"
+        return (
+            f"\nGenome:\n"
+            f"g: {self.g}\n"
+            f"z_c: {self.z_c}\n"
+            f"z_nc: {self.z_nc}\n"
+            f"length: {self.length}\n"
+            f"homogeneous: {self.homogeneous}\n"
+            f"gene_length: {self.gene_length}\n"
         )
-    
+
     def clone(self):
         genome = Genome(1, 1, 1)
         genome.z_c = self.z_c
@@ -54,29 +60,46 @@ class Genome:
         genome.loci_interval = self.loci_interval.copy()
         return genome
 
-    
     def init_genome(self):
         if self.orientation:
             orientation = np.array([1 for _ in range(self.g)], dtype=np.int_)
         else:
-            orientation = np.array([rd.choice([1, -1]) for _ in range(self.g)], dtype=np.int_)
-        
+            orientation = np.array(
+                [rd.choice([1, -1]) for _ in range(self.g)], dtype=np.int_
+            )
+
         if not self.homogeneous:
-            # To create non homogeneous genome, we start from a non coding genome. 
+            # To create non homogeneous genome, we start from a non coding genome.
             # g random locus of insertion are selected, and the genes are inserted.
             loci_of_insertion = sorted(rd.sample(range(0, self.z_nc), self.g))
-            loci = np.array([locus + (segment * self.gene_length) + 1 for segment, locus in enumerate(loci_of_insertion)], dtype=np.int_)
+            loci = np.array(
+                [
+                    locus + (segment * self.gene_length) + 1
+                    for segment, locus in enumerate(loci_of_insertion)
+                ],
+                dtype=np.int_,
+            )
             return loci, orientation
-        
+
         # To create homogeneous genome, promoters are regularly disposed.
         distance_between_promoters = self.gene_length + (self.z_nc // self.g)
-        loci = np.array([promoter * distance_between_promoters for promoter in range(self.g)], dtype=np.int_)
+        loci = np.array(
+            [promoter * distance_between_promoters for promoter in range(self.g)],
+            dtype=np.int_,
+        )
         return loci, orientation
 
     def compute_intervals(self):
         nc_at_junction = self.length + self.loci[0] - self.loci[-1] - self.gene_length
-        self.loci_interval = np.array([self.loci[i] - self.loci[i-1] - self.gene_length for i in range(1, len(self.loci))] + [nc_at_junction], dtype=np.int_)
-    
+        self.loci_interval = np.array(
+            [
+                self.loci[i] - self.loci[i - 1] - self.gene_length
+                for i in range(1, len(self.loci))
+            ]
+            + [nc_at_junction],
+            dtype=np.int_,
+        )
+
     def insertion_binary_search(self, target: int) -> int:
         if target < 0 or target > self.z_nc + self.g:
             raise ValueError("Target is out of the neutral space.")
@@ -100,7 +123,7 @@ class Genome:
             else:
                 right = middle - 1
         return left
-    
+
     def duplication_binary_search(self, target: int) -> int:
         if target < 0 or target > self.length - self.g:
             raise ValueError("Target is out of the neutral space.")
@@ -113,36 +136,39 @@ class Genome:
                 right = middle - 1
         return left
 
-    def insert(self, locus: int, length: int):
+    def insert(self, locus_index: int, length: int):
         self.z_nc += length
-        if locus != -1:
-            locus_after_insertion = self.loci >= locus
-            self.loci[locus_after_insertion] += length
+        self.loci[locus_index:] += length
         self.update_features()
-    
+
     def inverse(self, locus: int, length: int):
         end_locus = locus + length
         locus_affected = np.logical_and(self.loci >= locus, self.loci < end_locus)
-        self.loci[locus_affected] = (locus - 1) + (end_locus - (self.loci[locus_affected][::-1] + self.gene_length - 1))
-        self.orientation_list[locus_affected] = -self.orientation_list[locus_affected][::-1]
+        self.loci[locus_affected] = (locus - 1) + (
+            end_locus - (self.loci[locus_affected][::-1] + self.gene_length - 1)
+        )
+        self.orientation_list[locus_affected] = -self.orientation_list[locus_affected][
+            ::-1
+        ]
         self.update_features()
 
-    
     def delete(self, locus: int, length: int):
         self.z_nc -= length
         if locus < self.loci[-1]:
             locus_after_deletion = self.loci > locus
             self.loci[locus_after_deletion] -= length
         self.update_features()
-    
+
     def blend(self):
         nc_lengths = self.z_nc // self.g
         remaining_nc = self.z_nc % self.g
         distance_between_promoters = self.gene_length + nc_lengths
-        self.loci_interval = np.array([distance_between_promoters for _ in range(self.g)], dtype=np.int_)
+        self.loci_interval = np.array(
+            [distance_between_promoters for _ in range(self.g)], dtype=np.int_
+        )
         remaining_insertions = rd.sample(range(0, self.g), remaining_nc)
         self.loci_interval[remaining_insertions] += 1
-        
+
         self.loci = np.cumsum(self.loci_interval)
         self.loci_interval = self.loci_interval - self.gene_length
         self.loci = np.concatenate(([0], self.loci[:-1]))
@@ -150,7 +176,7 @@ class Genome:
         self.update_features(skip_intervals=True)
         return self
 
-    def update_features(self, skip_intervals: bool=False):
+    def update_features(self, skip_intervals: bool = False):
         self.length = self.z_c + self.z_nc
         if not skip_intervals:
             self.compute_intervals()
@@ -164,7 +190,5 @@ class Genome:
             self.max_length_neutral = distance
 
     def compute_stats(self):
-        """Compute the genome statistics.
-        """
+        """Compute the genome statistics."""
         self.stats.compute(self)
-
