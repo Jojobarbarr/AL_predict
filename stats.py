@@ -1,3 +1,5 @@
+import numpy as np
+
 class Statistics:
     def __init__(self) -> None:
         pass
@@ -51,3 +53,25 @@ class MutationStatistics(Statistics):
             "Length mean theory": theory[1],
             "Length standard deviation": length_std ** 0.5,
         }
+
+class GenomeStatistics(Statistics):
+    def __init__(self) -> None:
+        self.nc_proportion = 0
+        self.intervals_between_loci = np.empty(0)
+        self.d_stats = {}
+    
+    def clone(self):
+        clone = GenomeStatistics()
+        clone.nc_proportion = self.nc_proportion
+        clone.intervals_between_loci = self.intervals_between_loci.copy()
+        clone.d_stats = self.d_stats
+        return clone
+        
+    def compute(self, genome) -> None:
+        self.nc_proportion = genome.z_nc / genome.length
+        self.intervals_between_loci = np.sort(genome.loci_interval)
+        self.d_stats = {
+            "Non coding proportion": self.nc_proportion,
+            "Non coding length list": self.intervals_between_loci,
+        }
+    

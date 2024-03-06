@@ -1,9 +1,14 @@
-import sys
-from PyQt5.QtWidgets import QApplication, QScrollArea, QWidget, QLabel, QMessageBox, QGridLayout, QLineEdit, QPushButton, QVBoxLayout, QListView, QComboBox, QListWidget, QGroupBox, QFileDialog, QCheckBox
-from PyQt5.QtGui import QStandardItemModel, QStandardItem
-import PyQt5.QtCore as QtCore
 import json
-from pathlib import Path
+import sys
+
+import PyQt5.QtCore as QtCore
+from PyQt5.QtGui import QStandardItem, QStandardItemModel
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog,
+                             QGridLayout, QGroupBox, QLabel, QLineEdit,
+                             QListView, QMessageBox, QPushButton,
+                             QScrollArea, QVBoxLayout, QWidget)
+
+
 class ConfigGenerator(QWidget):
     def __init__(self):
         super().__init__()
@@ -63,7 +68,7 @@ class ConfigGenerator(QWidget):
         self.save_dir_selected_label = QLabel()
         paths_layout.addWidget(self.save_dir_selected_label, 1, 1)
         self.select_save_directory_button = QPushButton('Select Directory')
-        self.select_save_directory_button.clicked.connect(lambda: self.open_directory_dialog(self.save_dir_selected_label))
+        self.select_save_directory_button.clicked.connect(lambda: self.open_save_directory_dialog(self.save_dir_selected_label))
         paths_layout.addWidget(self.select_save_directory_button, 1, 2)
 
         # CHECKPOINT DIRECTORY
@@ -177,42 +182,42 @@ class ConfigGenerator(QWidget):
         self.mutation_rates_groupbox.setLayout(mutation_rates_layout)
 
         # POINT MUTATIONS RATE
-        self.point_mutations_rate_label = QLabel('Point mutations rate: ')
+        self.point_mutations_rate_label = QLabel('Point mutation rate: ')
         mutation_rates_layout.addWidget(self.point_mutations_rate_label, 0, 0)
         self.point_mutations_rate_edit = QLineEdit()
         self.point_mutations_rate_edit.setText('1e-9')
         mutation_rates_layout.addWidget(self.point_mutations_rate_edit, 0, 1)
 
         # SMALL INSERTIONS RATE
-        self.small_insertions_rate_label = QLabel('Small insertions rate: ')
+        self.small_insertions_rate_label = QLabel('Small insertion rate: ')
         mutation_rates_layout.addWidget(self.small_insertions_rate_label, 1, 0)
         self.small_insertions_rate_edit = QLineEdit()
         self.small_insertions_rate_edit.setText('1e-9')
         mutation_rates_layout.addWidget(self.small_insertions_rate_edit, 1, 1)
 
         # SMALL DELETIONS RATE
-        self.small_deletions_rate_label = QLabel('Small deletions rate: ')
+        self.small_deletions_rate_label = QLabel('Small deletion rate: ')
         mutation_rates_layout.addWidget(self.small_deletions_rate_label, 2, 0)
         self.small_deletions_rate_edit = QLineEdit()
         self.small_deletions_rate_edit.setText('1e-9')
         mutation_rates_layout.addWidget(self.small_deletions_rate_edit, 2, 1)
 
         # DELETIONS RATE
-        self.deletions_rate_label = QLabel('Deletions rate: ')
+        self.deletions_rate_label = QLabel('Deletion rate: ')
         mutation_rates_layout.addWidget(self.deletions_rate_label, 3, 0)
         self.deletions_rate_edit = QLineEdit()
         self.deletions_rate_edit.setText('1e-9')
         mutation_rates_layout.addWidget(self.deletions_rate_edit, 3, 1)
 
         # DUPLICATIONS RATE
-        self.duplications_rate_label = QLabel('Duplications rate: ')
+        self.duplications_rate_label = QLabel('Duplication rate: ')
         mutation_rates_layout.addWidget(self.duplications_rate_label, 4, 0)
         self.duplications_rate_edit = QLineEdit()
         self.duplications_rate_edit.setText('1e-9')
         mutation_rates_layout.addWidget(self.duplications_rate_edit, 4, 1)
 
         # INVERSIONS RATE
-        self.inversions_rate_label = QLabel('Inversions rate: ')
+        self.inversions_rate_label = QLabel('Inversion rate: ')
         mutation_rates_layout.addWidget(self.inversions_rate_label, 5, 0)
         self.inversions_rate_edit = QLineEdit()
         self.inversions_rate_edit.setText('1e-9')
@@ -267,11 +272,39 @@ class ConfigGenerator(QWidget):
 
         self.main_layout.addWidget(self.mutagenese_groupbox, 2, 1)
 
+        ## SIMULATION ##
+        self.simulation_groupbox = QGroupBox('Simulation')
+        simulation_layout = QGridLayout()
+        self.simulation_groupbox.setLayout(simulation_layout)
+
+        # GENERATION #
+        self.generation_label = QLabel('Generation: ')
+        simulation_layout.addWidget(self.generation_label, 0, 0)
+        self.generation_edit = QLineEdit()
+        self.generation_edit.setText("1e6")
+        simulation_layout.addWidget(self.generation_edit, 0, 1)
+
+        # POPULATION SIZE #
+        self.population_size_label = QLabel('Population size: ')
+        simulation_layout.addWidget(self.population_size_label, 1, 0)
+        self.population_size_edit = QLineEdit()
+        self.population_size_edit.setText("1e3")
+        simulation_layout.addWidget(self.population_size_edit, 1, 1)
+
+        # PLOT POINTS #
+        self.plot_points_label = QLabel("Plot points: ")
+        simulation_layout.addWidget(self.plot_points_label, 2, 0)
+        self.plot_points_edit = QLineEdit()
+        self.plot_points_edit.setText("10")
+        simulation_layout.addWidget(self.plot_points_edit, 2, 1)
+
+        self.main_layout.addWidget(self.simulation_groupbox, 3, 0)
+
 
         ## GENERATION BUTTON ##
         self.generate_button = QPushButton('Generate configuration file')
         self.generate_button.clicked.connect(self.generate_config)
-        self.main_layout.addWidget(self.generate_button, 3, 0, 1, 2)
+        self.main_layout.addWidget(self.generate_button, 4, 0, 2, 2)
 
 
         ## SCROLL BAR ##
@@ -326,6 +359,7 @@ class ConfigGenerator(QWidget):
                     item.widget().setEnabled(True)
             if experiment_type == "Mutagenese":
                 self.mutation_rates_groupbox.setEnabled(False)
+                self.simulation_groupbox.setEnabled(False)
             elif experiment_type == "Simulation":
                 self.mutagenese_groupbox.setEnabled(False)
             if self.variable_combo.currentText() == "No variable":
@@ -388,12 +422,12 @@ class ConfigGenerator(QWidget):
 
         ## MUTATION RATES
         d_params["Mutation rates"] = {
-            "Point mutations rate": self.point_mutations_rate_edit.text(),
-            "Small insertions rate": self.small_insertions_rate_edit.text(),
-            "Small deletions rate": self.small_deletions_rate_edit.text(),
-            "Deletions rate": self.deletions_rate_edit.text(),
-            "Duplications rate": self.duplications_rate_edit.text(),
-            "Inversions rate": self.inversions_rate_edit.text(),
+            "Point mutation rate": self.point_mutations_rate_edit.text(),
+            "Small insertion rate": self.small_insertions_rate_edit.text(),
+            "Small deletion rate": self.small_deletions_rate_edit.text(),
+            "Deletion rate": self.deletions_rate_edit.text(),
+            "Duplication rate": self.duplications_rate_edit.text(),
+            "Inversion rate": self.inversions_rate_edit.text(),
         }
         
 
@@ -406,20 +440,34 @@ class ConfigGenerator(QWidget):
             "Step": self.range_step_edit.text(),
         }
 
+        ## SIMULATION ##
+        d_params["Simulation"] = {
+            "Generations": self.generation_edit.text(),
+            "Population size": self.population_size_edit.text(),
+            "Plot points": self.plot_points_edit.text(),
+        }
+
         ## SAVE FILE ##
-        options = QFileDialog.Options()
-        save_file, _ = QFileDialog.getSaveFileName(self, "Save file", "", "JSON files (*.json)", options=options)
+        # options = QFileDialog.Options()
+        # save_file, _ = QFileDialog.getSaveFileName(self, "Save file", "", "JSON files (*.json)", options=options)
+        save_file = QFileDialog.getExistingDirectory(self, "Save file")
         if save_file:
-            with open(f"{save_file}.json", "w", encoding="utf8") as f:
+            save_file += f"/{self.experiment_name_edit.text()}.json"
+            with open(save_file, "w", encoding="utf8") as f:
                 json.dump(d_params, f, indent=2)
 
                 self.info_box("The configuration file was successfully generated at:\n"
-                             f"{save_file}.json")
+                              f"{save_file}")
 
     def open_directory_dialog(self, param):
         directory_path = QFileDialog.getExistingDirectory(self, "Select Directory")
         if directory_path:
             param.setText(directory_path)
+    
+    def open_save_directory_dialog(self, param):
+        directory_path = QFileDialog.getExistingDirectory(self, "Select Directory")
+        if directory_path:
+            param.setText(f"{directory_path}/{self.experiment_name_edit.text()}")
     
     def error_box(self, message):
         msgBox = QMessageBox()
