@@ -8,7 +8,7 @@ import graphics
 import mutations
 from experiment import Experiment
 from genome import Genome
-from utils import MUTATIONS, str_to_int
+from utils import MUTATIONS, str_to_int, L_M
 
 
 class Mutagenese(Experiment):
@@ -38,7 +38,10 @@ class Mutagenese(Experiment):
                 genome = self.prepare_mutagenese(0)
                 for mutation, name in zip(self.mutation_types, self.mutation_names):
                     print(f"Mutation type: {name}")
-                    self.results[name][888] = self.loop(mutation(self.l_m), genome)
+                    if name in L_M:
+                        self.results[name][888] = self.loop(mutation(self.l_m), genome)
+                    else:
+                        self.results[name][888] = self.loop(mutation(), genome)
                 del genome # genome can be very large
 
             else:
@@ -47,7 +50,10 @@ class Mutagenese(Experiment):
                     genome = self.prepare_mutagenese(10 ** power)
                     for mutation, name in zip(self.mutation_types, self.mutation_names):
                         print(f"Mutation type: {name}")
-                        self.results[name][power] = self.loop(mutation(self.l_m), genome)
+                        if name in L_M:
+                            self.results[name][power] = self.loop(mutation(self.l_m), genome)
+                        else:
+                            self.results[name][power] = self.loop(mutation(), genome)
                     del genome # genome can be very large
         
             graphics.save_stats(self.save_path, self.results)

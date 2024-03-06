@@ -115,8 +115,9 @@ class Genome:
 
     def insert(self, locus: int, length: int):
         self.z_nc += length
-        locus_after_insertion = self.loci >= locus
-        self.loci[locus_after_insertion] += length
+        if locus != -1:
+            locus_after_insertion = self.loci >= locus
+            self.loci[locus_after_insertion] += length
         self.update_features()
     
     def inverse(self, locus: int, length: int):
@@ -129,8 +130,9 @@ class Genome:
     
     def delete(self, locus: int, length: int):
         self.z_nc -= length
-        locus_after_deletion = self.loci > locus
-        self.loci[locus_after_deletion] -= length
+        if locus < self.loci[-1]:
+            locus_after_deletion = self.loci > locus
+            self.loci[locus_after_deletion] -= length
         self.update_features()
     
     def blend(self):
@@ -140,20 +142,25 @@ class Genome:
         self.loci_interval = np.array([distance_between_promoters for _ in range(self.g)], dtype=np.int_)
         remaining_insertions = rd.sample(range(0, self.g), remaining_nc)
         self.loci_interval[remaining_insertions] += 1
-
+        
         self.loci = np.cumsum(self.loci_interval)
+        self.loci_interval = self.loci_interval - self.gene_length
         self.loci = np.concatenate(([0], self.loci[:-1]))
-        self.orientation = np.array([1 for _ in range(self.g)], dtype=np.int_)
-        self.update_features()
+        self.orientation_list = np.array([1 for _ in range(self.g)], dtype=np.int_)
+        self.update_features(skip_intervals=True)
         return self
 
     def update_features(self, skip_intervals: bool=False):
         self.length = self.z_c + self.z_nc
         if not skip_intervals:
             self.compute_intervals()
-        self.max_length_neutral = self.loci_interval.min()
-        distance = self.length - self.loci[-1] + self.loci[0]
-        if distance < self.max_length_neutral:
+        self.max_length_neutral = self.loci_interval.max() + self.gene_length - 1
+        if not self.orientation:
+            self.max_length_neutral += self.gene_length - 1
+            distance = self.length - self.loci[-1] + self.loci[0] + self.gene_length - 2
+        else:
+            distance = self.length - self.loci[-1] + self.loci[0] - 1
+        if distance > self.max_length_neutral:
             self.max_length_neutral = distance
 
     def compute_stats(self):

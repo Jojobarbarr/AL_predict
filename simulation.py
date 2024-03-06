@@ -14,7 +14,7 @@ import graphics
 from experiment import Experiment
 from genome import Genome
 from mutations import Mutation
-from utils import MUTATIONS, str_to_int
+from utils import MUTATIONS, str_to_int, L_M
 
 PROFILE = False
 
@@ -48,6 +48,7 @@ class Simulation(Experiment):
         if self.checkpoints_path == Path(""):
             self.init_genomes(load_file)
 
+        self.checkpoint = str_to_int(self.simulation_config["Checkpoints"])
         
         # Vectorize the clone method to apply it efficiently to the whole population. 
         # https://numpy.org/doc/stable/reference/generated/numpy.vectorize.html
@@ -75,7 +76,7 @@ class Simulation(Experiment):
 
         # Mutations
         l_m = int(self.mutations_config["l_m"])
-        self.mutations = np.array([MUTATIONS[mutation_type](l_m=l_m) for mutation_type in mutation_types], dtype=Mutation)
+        self.mutations = np.array([MUTATIONS[mutation_type](l_m=l_m) if mutation_type in L_M else MUTATIONS[mutation_type]() for mutation_type in mutation_types], dtype=Mutation)
 
     def init_genomes(self, load_file: Path):
         self.blend = self.simulation_config["Blend"]
@@ -143,7 +144,7 @@ class Simulation(Experiment):
     
 
     def run(self, only_plot: bool=False, multiprocessing: bool=False, skip_generation_plots: bool=False):
-        if self.checkpoints_path == Path(""):
+        if self.checkpoints_path != Path(""):
             self.load_from_checkpoint(self.simulation_config["Generation Checkpoint"])
 
         if not only_plot:
@@ -196,7 +197,7 @@ class Simulation(Experiment):
                           f"- \033[1mEstimated remaining time: {self.format_time(average_time_perf * (self.generations - generation))}\033[0m")
                     time_perfs = []
                 
-                if generation % self.checkpoint == 0:
+                if self.simulation_config["Save checkpoints"] and generation % self.checkpoint == 0:
                     self.save_checkpoint(generation, genomes_changed, genomes_lengths, biases_genomes, total_bases_number)
                     
             print(f"Generation {generation} - End of simulation")
@@ -281,17 +282,18 @@ class Simulation(Experiment):
                              total_bases_number: int
                              ):
         # The lengths are only computed for genomes that were changed by a mutation.
-        changed_genomes_lengths = self.vec_genome_length(self.genomes[previous_changed_genomes_mask])
-        deltas = changed_genomes_lengths - genomes_lengths[previous_changed_genomes_mask]
-        delta = deltas.sum()
-        total_bases_number += delta
-        genomes_lengths[previous_changed_genomes_mask] = changed_genomes_lengths
+        if previous_changed_genomes_mask.any():
+            changed_genomes_lengths = self.vec_genome_length(self.genomes[previous_changed_genomes_mask])
+            deltas = changed_genomes_lengths - genomes_lengths[previous_changed_genomes_mask]
+            delta = deltas.sum()
+            total_bases_number += delta
+            genomes_lengths[previous_changed_genomes_mask] = changed_genomes_lengths
 
-        if delta != 0:
-            genomes_biases = genomes_lengths / total_bases_number
-        else:
-            # The normalized length are only computed for genomes that were changed by a mutation.
-            genomes_biases[previous_changed_genomes_mask] = genomes_lengths[previous_changed_genomes_mask] / total_bases_number
+            if delta != 0:
+                genomes_biases = genomes_lengths / total_bases_number
+            else:
+                # The normalized length are only computed for genomes that were changed by a mutation.
+                genomes_biases[previous_changed_genomes_mask] = genomes_lengths[previous_changed_genomes_mask] / total_bases_number
 
         # Determine the total number of event with a binomial law over all the bases.
         mutation_number = rd.binomialvariate(total_bases_number, p=self.total_mutation_rate)

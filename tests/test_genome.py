@@ -54,7 +54,7 @@ class TestGenome(unittest.TestCase):
         self.assertListEqual(genome.orientation_list.tolist(), [1, 1])
         self.assertEqual(len(genome.loci_interval), 2)
         self.assertListEqual(genome.loci_interval.tolist(), [2, 2])
-        self.assertEqual(genome.max_length_neutral, 2)
+        self.assertEqual(genome.max_length_neutral, 4)
 
     def test_clone(self):
         genome = Genome(2, 6, 4, homogeneous=True, orientation=True)
@@ -194,13 +194,13 @@ class TestGenome(unittest.TestCase):
         with patch("random.sample", return_value=[1, 3, 4, 10, 15, 22, 30, 32, 33, 40]):
             genome = Genome(10, 100, 50, homogeneous=True, orientation=True)
         self.assertListEqual(genome.loci.tolist(), [0, 15, 30, 45, 60, 75, 90, 105, 120, 135])
-        self.assertEqual(genome.max_length_neutral, 5)
-        genome.delete(11, 2)
-        self.assertEqual(genome.max_length_neutral, 3)
-        genome.delete(146, 3)
-        self.assertEqual(genome.max_length_neutral, 2)
+        self.assertEqual(genome.max_length_neutral, 14)
+        genome.insert(11, 4)
+        self.assertEqual(genome.max_length_neutral, 18)
+        genome.insert(146, 7)
+        self.assertEqual(genome.max_length_neutral, 21)
         genome.blend()
-        self.assertEqual(genome.max_length_neutral, 4)
+        self.assertEqual(genome.max_length_neutral, 16)
 
 if __name__ == "__main__":
     unittest.main()

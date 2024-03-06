@@ -1,5 +1,4 @@
 import random as rd
-from typing import Callable
 
 from genome import Genome
 from stats import MutationStatistics
@@ -24,7 +23,7 @@ class Mutation:
         self.stats.count += 1
         return True
 
-    def apply(self, genome: Genome, switched: bool=False, *args):
+    def apply(self, genome: Genome, switched: bool=False, virtually: bool=False):
         self.stats.neutral_count += 1
         if switched:
             self.length = genome.length - self.length
@@ -65,8 +64,9 @@ class Mutation:
         """
         insertion_locus_index = genome.insertion_binary_search(self.insertion_locus)
         if insertion_locus_index == len(genome.loci):
-            insertion_locus_index = 0
-        self.insertion_locus = genome.loci[insertion_locus_index]
+            self.insertion_locus = -1
+        else:
+            self.insertion_locus = genome.loci[insertion_locus_index]
     
     def ending_point_is_ok(self, genome: Genome, next_promoter_locus_index: int) -> bool:
         """Checks if ending point is neutral. Ending point is neutral if length is less than distance between next promoter and starting point.
@@ -88,7 +88,7 @@ class Mutation:
         
         return False
     
-    def theory(self, genome: Genome) -> tuple[float, float]:
+    def theory(self) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
 
         Returns:
@@ -100,15 +100,8 @@ class Mutation:
 
 
 class PointMutation(Mutation):
-    def __init__(self, l_m: int=-1, DEBUG: bool=False) -> None:
-        """
-
-        Args:
-            rate (float): rate of occurence.
-            genome (Genome): genome on which the mutation is applied.
-            DEBUG (bool, optional): Flag to activate prints. Defaults to False.. Defaults to False.
-        """
-        super().__init__("Point Mutation", DEBUG)
+    def __init__(self) -> None:
+        super().__init__("Point Mutation")
     
     def is_neutral(self, genome: Genome) -> bool:
         """Check if mutation is neutral. Point mutation is neutral if it affects a non coding base.
@@ -116,7 +109,7 @@ class PointMutation(Mutation):
 
         Returns:
             bool: True if mutation is neutral, False if it is deleterious.
-        """
+        """        
         super().is_neutral(genome)
         return self.Bernoulli(genome.z_nc / genome.length)
     
@@ -131,15 +124,8 @@ class PointMutation(Mutation):
 
 
 class SmallInsertion(Mutation):
-    def __init__(self, l_m: int=10, DEBUG: bool=False) -> None:
-        """
-        Args:
-            rate (float): rate of occurence.
-            l_m (int): maximum length of the mutation.
-            genome (Genome): genome on which the mutation is applied.
-            DEBUG (bool, optional): Flag to activate prints. Defaults to False.
-        """
-        super().__init__("Small Insertion", DEBUG)
+    def __init__(self, l_m: int=10) -> None:
+        super().__init__("Small Insertion")
         self.is_small = True
         self.l_m = l_m
 
@@ -151,7 +137,7 @@ class SmallInsertion(Mutation):
             bool: True if mutation is neutral, False if it is deleterious.
         """
         super().is_neutral(genome)
-        return self.Bernoulli((genome.z_nc + genome.g) / genome.length) or self.DEBUG
+        return self.Bernoulli((genome.z_nc + genome.g) / genome.length)
     
     def apply(self, genome: Genome, virtually: bool=False):
         """Apply the mutation. If virtually is True, all the mutation characteristics are determined but it is not applied on the genome.
@@ -169,31 +155,6 @@ class SmallInsertion(Mutation):
         if not virtually:
             genome.insert(self.insertion_locus, self.length)
     
-    def test(self, genome: Genome, insertion_locus_nc_coord: int, answer: int):
-        """Test the implementation.
-
-        Args:
-            insertion_locus_nc_coord (int): Absolute position of the insertion in the neutral space.
-            answer (int): Expected self.insertion_locus value.
-        """
-        print(f"Insertion locus in non coding space: {insertion_locus_nc_coord}")
-
-        self.insertion_locus = insertion_locus_nc_coord        
-        self.map_local_to_absolute_locus(genome)
-
-        if answer != self.insertion_locus:
-            raise ValueError(f"Mapping is wrong, it gave {self.insertion_locus} when it was supposed to give {answer}")
-        
-        print(f"Insertion locus after mapping: {self.insertion_locus}")
-
-        self.set_length(genome)
-
-        print(f"Neutral", self,
-              f"\n\tStarting point: {self.insertion_locus}\n"
-              f"\tLength: {self.length}")
-        
-        genome.insert(self.insertion_locus, self.length, )
-
     def theory(self, genome: Genome) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
 
@@ -206,14 +167,8 @@ class SmallInsertion(Mutation):
 
 
 class Deletion(Mutation):
-    def __init__(self, l_m: int=-1, DEBUG: bool=False) -> None:
-        """
-        Args:
-            rate (float): rate of occurence.
-            genome (Genome): genome on which the mutation is applied.
-            DEBUG (bool, optional): Flag to activate prints. Defaults to False.
-        """
-        super().__init__("Deletion", DEBUG)
+    def __init__(self) -> None:
+        super().__init__("Deletion")
 
     def length_is_ok(self, genome: Genome) -> bool:
         """Checks if length is neutral.
@@ -248,7 +203,7 @@ class Deletion(Mutation):
             bool: True if mutation is neutral, False if it is deleterious.
         """
         super().is_neutral(genome)
-        if not self.Bernoulli(genome.z_nc / genome.length) and not self.DEBUG:
+        if not self.Bernoulli(genome.z_nc / genome.length):
             return False
         
         self.set_length(genome)
@@ -256,7 +211,7 @@ class Deletion(Mutation):
         if not self.length_is_ok(genome):
             return False
 
-        return self.ending_point_is_ok(genome, self.set_starting_point(genome)) or self.DEBUG
+        return self.ending_point_is_ok(genome, self.set_starting_point(genome))
     
     def apply(self, genome: Genome, virtually: bool=False):
         """Applies the mutation. If virtually is True, all the mutation characteristics are determined but it is not applied on the genome.
@@ -276,53 +231,6 @@ class Deletion(Mutation):
                 genome.delete(0, self.length - end_deletion_length)
             else:
                 genome.delete(self.starting_point, self.length)
-    
-    def test(self, genome: Genome, starting_point_nc_coord: int, answer: int):
-        """Test the implementation.
-
-        Args:
-            starting_point_nc_coord (int): Absolute position of the starting_point in the neutral space.
-            answer (int): Expected self.starting_point value.
-        """
-        if self.is_small:
-            print("This is a small deletion")
-        print(f"Insertion locus in neutral space: {starting_point_nc_coord}")
-
-        self.length = 3
-
-        self.starting_point = starting_point_nc_coord
-        next_promoter_locus_index = genome.deletion_binary_search(self.starting_point)
-        self.starting_point += next_promoter_locus_index * genome.gene_length
-
-        
-        # Handle the case when starting point is between last promoter and ORI.
-        if next_promoter_locus_index == len(genome.loci):
-            # In circular genome case, first promoter locus is self.genome.loci[0] (mod self.genome.length).
-            next_promoter_locus = genome.length + genome.loci[0]
-        else:
-            next_promoter_locus = genome.loci[next_promoter_locus_index]
-
-        if not (self.length <= next_promoter_locus - self.starting_point):
-            print(f"This mutation is deleterious due to bad ending point")
-            print(self)
-            return None
-
-
-        if answer != self.starting_point:
-            raise ValueError(f"Mapping is wrong, it gave {self.starting_point} when it was supposed to give {answer}")
-        
-        print(f"Starting point locus after mapping: {self.starting_point}")
-
-        print(f"Neutral", self,
-              f"\n\tStarting point: {self.starting_point}\n"
-              f"\tLength: {self.length}")
-        
-        if self.starting_point > genome.loci[-1]:
-            end_deletion_length = min(genome.length - self.starting_point, self.length)
-            genome.delete(genome.loci[-1], end_deletion_length)
-            genome.delete(0, self.length - end_deletion_length)
-        else:
-            genome.delete(self.starting_point, self.length)
         
     def theory(self, genome: Genome) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
@@ -335,7 +243,7 @@ class Deletion(Mutation):
 
 
 class SmallDeletion(Deletion):
-    def __init__(self, l_m: int=10, DEBUG: bool = False) -> None:
+    def __init__(self, l_m: int=10) -> None:
         """
         Args:
             rate (float): rate of occurence.
@@ -343,10 +251,10 @@ class SmallDeletion(Deletion):
             genome (Genome): genome on which the mutation is applied.
             DEBUG (bool, optional): Flag to activate prints. Defaults to False.
         """
-        super().__init__(l_m, DEBUG)
+        super().__init__()
         self.is_small = True
         self.l_m = l_m
-        self.type = "Small Deletion"
+        self.name = "Small Deletion"
     
     def theory(self, genome: Genome) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
@@ -358,14 +266,24 @@ class SmallDeletion(Deletion):
                 ((genome.z_nc / genome.g) * (self.l_m + 1) / 2 + (1 - self.l_m ** 2) / 3) / (genome.z_nc / genome.g - (self.l_m - 1) / 2))
 
 class Duplication(Mutation):
-    def __init__(self, l_m: int=-1, DEBUG: bool = False) -> None:
+    def __init__(self) -> None:
         """
         Args:
             rate (float): rate of occurence.
             genome (Genome): genome on which the mutation is applied.
             DEBUG (bool, optional): Flag to activate prints. Defaults to False.
         """
-        super().__init__("Duplication", DEBUG)
+        super().__init__("Duplication")
+    
+    def length_is_ok(self, genome: Genome) -> bool:
+        """Checks if length is neutral.
+
+        Returns:
+            bool: If length is deleterious, return False.
+        """
+        if self.length <= genome.max_length_neutral:
+            return True
+        return False
     
     def set_starting_point(self, genome: Genome) -> int:
         """Sets duplication starting point. The starting poisition is a random base position in genome as long as it is not a promoter. 
@@ -378,18 +296,7 @@ class Duplication(Mutation):
         next_promoter_locus_index = genome.duplication_binary_search(self.starting_point)
         self.starting_point += next_promoter_locus_index
         return next_promoter_locus_index
-
-
-    def length_is_ok(self, genome: Genome) -> bool:
-        """Checks if length is neutral.
-
-        Returns:
-            bool: If length is deleterious, return False.
-        """
-        if self.length <= genome.max_length_neutral + 2 * (genome.gene_length - 1):
-            return True
-        return False
-
+    
     def ending_point_is_ok(self, genome: Genome, next_promoter_locus_index: int) -> bool:
         """Checks if ending point is neutral. Ending point is neutral if length is less than distance between next promoter and starting point.
 
@@ -399,21 +306,22 @@ class Duplication(Mutation):
         Returns:
             bool: Return False if ending point is deleterious.
         """
-        # Handle the case when starting point is between last promoter and ORI.
-        if next_promoter_locus_index == len(genome.loci):
-            # In circular genome case, first promoter locus is self.genome.loci[0] (mod self.genome.length).
-            if genome.orientation_list[-1] == -1:
-                next_promoter_locus = genome.length + genome.loci[0] + genome.gene_length - 1
-            else:
-                next_promoter_locus = genome.length + genome.loci[0]
+        if (genome.loci[next_promoter_locus_index - 1] + genome.gene_length > self.starting_point and
+        genome.orientation_list[next_promoter_locus_index - 1] == -1 and
+        next_promoter_locus_index != 0):
+            next_promoter_locus = genome.loci[next_promoter_locus_index - 1] + genome.gene_length - 1
         else:
+            next_promoter_locus = 0
+            if next_promoter_locus_index == len(genome.loci):
+                # In circular genome case, first promoter locus is genome.loci[0] (mod genome.length).
+                next_promoter_locus_index = 0
+                next_promoter_locus = genome.length
             if genome.orientation_list[next_promoter_locus_index] == -1:
-                next_promoter_locus = genome.loci[next_promoter_locus_index] + genome.gene_length - 1
+                next_promoter_locus += genome.loci[next_promoter_locus_index] + genome.gene_length - 1
             else:
-                next_promoter_locus = genome.loci[next_promoter_locus_index]
+                next_promoter_locus += genome.loci[next_promoter_locus_index]
         if self.length <= next_promoter_locus - self.starting_point:
             return True
-        
         return False
     
     def is_neutral(self, genome: Genome) -> bool:
@@ -456,56 +364,6 @@ class Duplication(Mutation):
         if not virtually:
             genome.insert(self.insertion_locus, self.length)
     
-    def test(self, genome: Genome, starting_point_nc_coord: int, answer1: int, insertion_locus_nc_coord: int, answer2: int):
-        """Test the implementation.
-
-        Args:
-            starting_point_nc_coord (int): Absolute position of the starting point in the neutral space.
-            answer1 (int): Expected self.starting_point value.
-            insertion_locus_nc_coord (int): Absolute position of the insertion in the neutral space.
-            answer1 (int): Expected self.insertion_locus value.
-        """
-        print(f"Starting point locus in neutral space: {starting_point_nc_coord}")
-
-        self.length = 4
-
-        self.starting_point = starting_point_nc_coord
-        next_promoter_locus_index = genome.duplication_binary_search(self.starting_point)
-        self.starting_point += next_promoter_locus_index
-
-        print(f"Starting point locus after mapping: {self.starting_point}") 
-
-        # Handle the case when starting point is between last promoter and ORI.
-        if next_promoter_locus_index == len(genome.loci):
-            # In circular genome case, first promoter locus is self.genome.loci[0] (mod self.genome.length).
-            next_promoter_locus = genome.length + genome.loci[0]
-        else:
-            next_promoter_locus = genome.loci[next_promoter_locus_index]
-        if not (self.length <= next_promoter_locus - self.starting_point):
-            print(f"This mutation is deleterious due to bad ending point")
-            print(self)
-            return None
-
-        
-
-        if answer1 != self.starting_point:
-            raise ValueError(f"Mapping is wrong, it gave {self.starting_point} when it was supposed to give {answer1}")
-        
-        print(f"Insertion locus in neutral space: {insertion_locus_nc_coord}")
-
-        self.insertion_locus = insertion_locus_nc_coord
-        self.map_local_to_absolute_locus(genome)
-
-        if answer2 != self.insertion_locus:
-            raise ValueError(f"Mapping is wrong, it gave {self.insertion_locus} when it was supposed to give {answer2}")
-        
-        print(f"Insertion locus after mapping: {self.insertion_locus}")
-        print(f"Neutral", self,
-              f"\n\tStarting point: {self.starting_point}\n"
-              f"\tLength: {self.length}\n"
-              f"\tInsertion locus: {self.insertion_locus}")
-        genome.insert(self.insertion_locus, self.length)
-    
     def theory(self, genome: Genome) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.
 
@@ -518,14 +376,14 @@ class Duplication(Mutation):
         
 
 class Inversion(Mutation):
-    def __init__(self, l_m: int=-1, DEBUG: bool = False) -> None:
+    def __init__(self) -> None:
         """
         Args:
             rate (float): rate of occurence.
             genome (Genome): genome on which the mutation is applied.
             DEBUG (bool, optional): Flag to activate prints. Defaults to False.
         """
-        super().__init__("Inversion", DEBUG)
+        super().__init__("Inversion")
     
     def set_breaking_locus(self, genome: Genome) -> bool:
         switched = False
@@ -555,9 +413,9 @@ class Inversion(Mutation):
             bool: True if mutation is neutral, False if it is deleterious.
         """
         super().is_neutral(genome)
-        if not self.Bernoulli((genome.z_nc + genome.g) / genome.length) and not self.DEBUG:
+        if not self.Bernoulli((genome.z_nc + genome.g) / genome.length):
             return False
-        return self.Bernoulli((genome.z_nc + genome.g - 1) / (genome.length - 1)) or self.DEBUG
+        return self.Bernoulli((genome.z_nc + genome.g - 1) / (genome.length - 1))
 
     
     def apply(self, genome: Genome, virtually: bool=False):
@@ -572,53 +430,6 @@ class Inversion(Mutation):
         
         if not virtually:
             genome.inverse(self.starting_point, length)
-    
-    def test(self, genome: Genome, starting_point_nc_coord: int, answer1: int, ending_point_nc_coord: int, answer2: int):
-        """Test the implementation.
-
-        Args:
-            starting_point_nc_coord (int): Absolute position of the starting point in the neutral space.
-            answer1 (int): Expected self.starting_point value.
-            ending_point_nc_coord (int): Absolute position of the ending point in the neutral space.
-            answer1 (int): Expected ending_point value.
-        """
-        print(f"Starting point locus in neutral space: {starting_point_nc_coord}")
-
-        switched = False
-        breaking_locus = [starting_point_nc_coord, ending_point_nc_coord]
-        if breaking_locus[1] < breaking_locus[0]:
-            breaking_locus[0], breaking_locus[1] = breaking_locus[0], breaking_locus[1]
-            switched = True
-        next_promoter_locus_index_starting_point = genome.insertion_binary_search(breaking_locus[0])
-        next_promoter_locus_index_ending_point = genome.insertion_binary_search(breaking_locus[1])
-
-        self.starting_point = breaking_locus[0] + (genome.gene_length - 1) * (next_promoter_locus_index_starting_point - 1)
-        ending_point = breaking_locus[1] + (genome.gene_length - 1) * (next_promoter_locus_index_ending_point - 1)
-        self.length = ending_point - self.starting_point
-        if switched:
-            self.length = genome.length - self.length
-
-        if answer1 != self.starting_point:
-            raise ValueError(f"Mapping is wrong, it gave {self.starting_point} when it was supposed to give {answer1}")
-        
-        print(f"Starting point locus after mapping: {self.starting_point}")
-
-        print(f"Ending point locus in neutral space: {ending_point_nc_coord}")
-
-        ending_point = ending_point_nc_coord
-        next_promoter_locus_index_ending_point = genome.insertion_binary_search(ending_point)
-        ending_point += (genome.gene_length - 1) * (next_promoter_locus_index_ending_point - 1)
-
-        if answer2 != ending_point - self.starting_point:
-            raise ValueError(f"Mapping is wrong, it gave {ending_point - self.starting_point} when it was supposed to give {answer2}")
-        
-        print(f"Ending point locus after mapping: {ending_point}")
-
-        print(f"Neutral", self,
-              f"\n\tStarting point: {self.starting_point}\n"
-              f"\tLength: {ending_point - self.starting_point}")
-        
-        genome.inverse(self.starting_point, ending_point - self.starting_point)
     
     def theory(self, genome: Genome) -> tuple[float, float]:
         """Returns the theoretical mutation neutrality probability from the mathematical model.

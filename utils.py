@@ -9,6 +9,11 @@ MUTATIONS = {
     "Inversion": mutations.Inversion,
 }
 
+L_M = {
+    "Small insertion",
+    "Small deletion",
+}
+
 def str_to_int(string: str) -> int:
     return int(float(string))
 
