@@ -87,9 +87,7 @@ def plot_simulation(
     plt.savefig(save_path / f"{name.lower().replace(' ', '_')}.jpg")
 
 
-def plot_generation(
-    statistics, generation, min, max, ymax, name, save_path: Path
-):
+def plot_generation(statistics, generation, min, max, ymax, name, save_path: Path):
     save_path.mkdir(parents=True, exist_ok=True)
     save_path_fixed = save_path / "fixed"
     save_path_fixed.mkdir(parents=True, exist_ok=True)
