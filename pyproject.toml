@@ -1,11 +1,6 @@
 [tool.black]
 line-length = 88
-include = '''
-    /(
-        | \.pyi?$
-        | \.ipynb
-    )/
-'''
+include = '\.py$|\.ipynb$'
 exclude = '''
     /(
         | \.git
