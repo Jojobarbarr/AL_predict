@@ -37,4 +37,4 @@ jobs:
           git config --global user.name "GitHub Actions"
           git add .
           git commit -m "Auto-format Python code with Black"
-          git push https://${{ secrets.reformat_black }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          git push https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
