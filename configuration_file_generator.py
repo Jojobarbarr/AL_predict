@@ -3,10 +3,22 @@ import sys
 
 import PyQt5.QtCore as QtCore
 from PyQt5.QtGui import QStandardItem, QStandardItemModel
-from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog,
-                             QGridLayout, QGroupBox, QLabel, QLineEdit,
-                             QListView, QMessageBox, QPushButton,
-                             QScrollArea, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QGridLayout,
+    QGroupBox,
+    QLabel,
+    QLineEdit,
+    QListView,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class ConfigGenerator(QWidget):
@@ -15,41 +27,38 @@ class ConfigGenerator(QWidget):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle('Configuration File Generator')
+        self.setWindowTitle("Configuration File Generator")
         self.showMaximized()
-        
 
         self.main_widget = QWidget()  # Create a widget to hold your layout
         self.main_layout = QGridLayout(self.main_widget)
 
-
         ## EXPERIMENT ##
-        self.experiment_groupbox = QGroupBox('Experiment')
+        self.experiment_groupbox = QGroupBox("Experiment")
         experiment_layout = QGridLayout()
         self.experiment_groupbox.setLayout(experiment_layout)
-        
+
         # EXPERIMENT NAME
-        self.experiment_name_label = QLabel('Experiment name: ')
+        self.experiment_name_label = QLabel("Experiment name: ")
         experiment_layout.addWidget(self.experiment_name_label, 0, 0)
         self.experiment_name_edit = QLineEdit()
         experiment_layout.addWidget(self.experiment_name_edit, 0, 1)
         self.experiment_name_edit.textChanged.connect(self.handle_experiment_change)
 
         # EXPERIMENT TYPE
-        self.experiment_type_label = QLabel('Experiment type: ')
+        self.experiment_type_label = QLabel("Experiment type: ")
         experiment_layout.addWidget(self.experiment_type_label, 1, 0)
         self.experiment_type_combo = QComboBox()
         self.experiment_type_combo.addItems(["Mutagenese", "Simulation"])
         experiment_layout.addWidget(self.experiment_type_combo, 1, 1)
-        self.experiment_type_combo.currentIndexChanged.connect(self.handle_experiment_change)
-
+        self.experiment_type_combo.currentIndexChanged.connect(
+            self.handle_experiment_change
+        )
 
         self.main_layout.addWidget(self.experiment_groupbox, 0, 0)
 
-
-
         ## PATHS ##
-        self.paths_groupbox = QGroupBox('Paths')
+        self.paths_groupbox = QGroupBox("Paths")
         paths_layout = QGridLayout()
         self.paths_groupbox.setLayout(paths_layout)
 
@@ -58,8 +67,10 @@ class ConfigGenerator(QWidget):
         paths_layout.addWidget(self.home_dir_label, 0, 0)
         self.home_dir_selected_label = QLabel()
         paths_layout.addWidget(self.home_dir_selected_label, 0, 1)
-        self.select_home_directory_button = QPushButton('Select Directory')
-        self.select_home_directory_button.clicked.connect(lambda: self.open_directory_dialog(self.home_dir_selected_label))
+        self.select_home_directory_button = QPushButton("Select Directory")
+        self.select_home_directory_button.clicked.connect(
+            lambda: self.open_directory_dialog(self.home_dir_selected_label)
+        )
         paths_layout.addWidget(self.select_home_directory_button, 0, 2)
 
         # SAVE DIRECTORY
@@ -67,8 +78,10 @@ class ConfigGenerator(QWidget):
         paths_layout.addWidget(self.save_dir_label, 1, 0)
         self.save_dir_selected_label = QLabel()
         paths_layout.addWidget(self.save_dir_selected_label, 1, 1)
-        self.select_save_directory_button = QPushButton('Select Directory')
-        self.select_save_directory_button.clicked.connect(lambda: self.open_save_directory_dialog(self.save_dir_selected_label))
+        self.select_save_directory_button = QPushButton("Select Directory")
+        self.select_save_directory_button.clicked.connect(
+            lambda: self.open_save_directory_dialog(self.save_dir_selected_label)
+        )
         paths_layout.addWidget(self.select_save_directory_button, 1, 2)
 
         # CHECKPOINT DIRECTORY
@@ -76,16 +89,16 @@ class ConfigGenerator(QWidget):
         paths_layout.addWidget(self.checkpoint_dir_label, 2, 0)
         self.checkpoint_dir_selected_label = QLabel()
         paths_layout.addWidget(self.checkpoint_dir_selected_label, 2, 1)
-        self.select_checkpoint_directory_button = QPushButton('Select Directory')
-        self.select_checkpoint_directory_button.clicked.connect(lambda: self.open_directory_dialog(self.checkpoint_dir_selected_label))
+        self.select_checkpoint_directory_button = QPushButton("Select Directory")
+        self.select_checkpoint_directory_button.clicked.connect(
+            lambda: self.open_directory_dialog(self.checkpoint_dir_selected_label)
+        )
         paths_layout.addWidget(self.select_checkpoint_directory_button, 2, 2)
 
         self.main_layout.addWidget(self.paths_groupbox, 0, 1)
 
-
-
         ## MUTATIONS ##
-        self.mutations_groupbox = QGroupBox('Mutations')
+        self.mutations_groupbox = QGroupBox("Mutations")
         mutations_layout = QGridLayout()
         self.mutations_groupbox.setLayout(mutations_layout)
 
@@ -102,18 +115,15 @@ class ConfigGenerator(QWidget):
         self.l_m_edit.setText("10")
         mutations_layout.addWidget(self.l_m_edit, 1, 1)
 
-
         self.main_layout.addWidget(self.mutations_groupbox, 1, 0)
 
-
-
         ## GENOME ##
-        self.genome_groupbox = QGroupBox('Genome')
+        self.genome_groupbox = QGroupBox("Genome")
         genome_layout = QGridLayout()
         self.genome_groupbox.setLayout(genome_layout)
 
         # G
-        self.g_label = QLabel('g: ')
+        self.g_label = QLabel("g: ")
         genome_layout.addWidget(self.g_label, 0, 0)
         self.g_edit = QLineEdit()
         self.g_edit.setText("1e3")
@@ -132,7 +142,7 @@ class ConfigGenerator(QWidget):
 
         self.z_c_factor_label = QLabel("g")
         genome_layout.addWidget(self.z_c_factor_label, 1, 2)
-        
+
         # AUTO_Z_NC
         self.auto_z_nc_checkbox = QCheckBox()
         self.auto_z_nc_checkbox.setText("Keep z_nc to: ")
@@ -148,14 +158,14 @@ class ConfigGenerator(QWidget):
         genome_layout.addWidget(self.z_nc_factor_label, 2, 2)
 
         # Z_C
-        self.z_c_label = QLabel('z_c: ')
+        self.z_c_label = QLabel("z_c: ")
         genome_layout.addWidget(self.z_c_label, 3, 0)
         self.z_c_edit = QLineEdit()
         self.z_c_edit.setText("1e6")
         genome_layout.addWidget(self.z_c_edit, 3, 1, 1, 2)
 
         # Z_NC
-        self.z_nc_label = QLabel('z_nc: ')
+        self.z_nc_label = QLabel("z_nc: ")
         genome_layout.addWidget(self.z_nc_label, 4, 0)
         self.z_nc_edit = QLineEdit()
         self.z_nc_edit.setText("1e6")
@@ -173,67 +183,62 @@ class ConfigGenerator(QWidget):
 
         self.main_layout.addWidget(self.genome_groupbox, 1, 1, 1, 2)
 
-
-
-
         ## MUTATION RATES
-        self.mutation_rates_groupbox = QGroupBox('Mutation rates')
+        self.mutation_rates_groupbox = QGroupBox("Mutation rates")
         mutation_rates_layout = QGridLayout(self.mutation_rates_groupbox)
         self.mutation_rates_groupbox.setLayout(mutation_rates_layout)
 
         # POINT MUTATIONS RATE
-        self.point_mutations_rate_label = QLabel('Point mutation rate: ')
+        self.point_mutations_rate_label = QLabel("Point mutation rate: ")
         mutation_rates_layout.addWidget(self.point_mutations_rate_label, 0, 0)
         self.point_mutations_rate_edit = QLineEdit()
-        self.point_mutations_rate_edit.setText('1e-9')
+        self.point_mutations_rate_edit.setText("1e-9")
         mutation_rates_layout.addWidget(self.point_mutations_rate_edit, 0, 1)
 
         # SMALL INSERTIONS RATE
-        self.small_insertions_rate_label = QLabel('Small insertion rate: ')
+        self.small_insertions_rate_label = QLabel("Small insertion rate: ")
         mutation_rates_layout.addWidget(self.small_insertions_rate_label, 1, 0)
         self.small_insertions_rate_edit = QLineEdit()
-        self.small_insertions_rate_edit.setText('1e-9')
+        self.small_insertions_rate_edit.setText("1e-9")
         mutation_rates_layout.addWidget(self.small_insertions_rate_edit, 1, 1)
 
         # SMALL DELETIONS RATE
-        self.small_deletions_rate_label = QLabel('Small deletion rate: ')
+        self.small_deletions_rate_label = QLabel("Small deletion rate: ")
         mutation_rates_layout.addWidget(self.small_deletions_rate_label, 2, 0)
         self.small_deletions_rate_edit = QLineEdit()
-        self.small_deletions_rate_edit.setText('1e-9')
+        self.small_deletions_rate_edit.setText("1e-9")
         mutation_rates_layout.addWidget(self.small_deletions_rate_edit, 2, 1)
 
         # DELETIONS RATE
-        self.deletions_rate_label = QLabel('Deletion rate: ')
+        self.deletions_rate_label = QLabel("Deletion rate: ")
         mutation_rates_layout.addWidget(self.deletions_rate_label, 3, 0)
         self.deletions_rate_edit = QLineEdit()
-        self.deletions_rate_edit.setText('1e-9')
+        self.deletions_rate_edit.setText("1e-9")
         mutation_rates_layout.addWidget(self.deletions_rate_edit, 3, 1)
 
         # DUPLICATIONS RATE
-        self.duplications_rate_label = QLabel('Duplication rate: ')
+        self.duplications_rate_label = QLabel("Duplication rate: ")
         mutation_rates_layout.addWidget(self.duplications_rate_label, 4, 0)
         self.duplications_rate_edit = QLineEdit()
-        self.duplications_rate_edit.setText('1e-9')
+        self.duplications_rate_edit.setText("1e-9")
         mutation_rates_layout.addWidget(self.duplications_rate_edit, 4, 1)
 
         # INVERSIONS RATE
-        self.inversions_rate_label = QLabel('Inversion rate: ')
+        self.inversions_rate_label = QLabel("Inversion rate: ")
         mutation_rates_layout.addWidget(self.inversions_rate_label, 5, 0)
         self.inversions_rate_edit = QLineEdit()
-        self.inversions_rate_edit.setText('1e-9')
+        self.inversions_rate_edit.setText("1e-9")
         mutation_rates_layout.addWidget(self.inversions_rate_edit, 5, 1)
 
         self.main_layout.addWidget(self.mutation_rates_groupbox, 2, 0)
 
-
-
         ## MUTAGENESE ##
-        self.mutagenese_groupbox = QGroupBox('Mutagenese')
+        self.mutagenese_groupbox = QGroupBox("Mutagenese")
         mutagenese_layout = QGridLayout()
         self.mutagenese_groupbox.setLayout(mutagenese_layout)
 
         # ITERATIONS
-        self.iterations_label = QLabel('Iterations: ')
+        self.iterations_label = QLabel("Iterations: ")
         mutagenese_layout.addWidget(self.iterations_label, 0, 0)
         self.iterations_edit = QLineEdit()
         self.iterations_edit.setText("1e6")
@@ -253,19 +258,19 @@ class ConfigGenerator(QWidget):
         self.range_min_label = QLabel("From: ")
         range_layout.addWidget(self.range_min_label, 0, 0)
         self.range_min_edit = QLineEdit()
-        self.range_min_edit.setText('1e2')
+        self.range_min_edit.setText("1e2")
         range_layout.addWidget(self.range_min_edit, 0, 1)
 
         self.range_max_label = QLabel("To: ")
         range_layout.addWidget(self.range_max_label, 0, 2)
         self.range_max_edit = QLineEdit()
-        self.range_max_edit.setText('1e6')
+        self.range_max_edit.setText("1e6")
         range_layout.addWidget(self.range_max_edit, 0, 3)
 
         self.range_step_label = QLabel("\tPower step: ")
         range_layout.addWidget(self.range_step_label, 0, 4)
         self.range_step_edit = QLineEdit()
-        self.range_step_edit.setText('1')
+        self.range_step_edit.setText("1")
         range_layout.addWidget(self.range_step_edit, 0, 5)
 
         mutagenese_layout.addWidget(self.range_widget, 2, 0, 1, 2)
@@ -273,19 +278,19 @@ class ConfigGenerator(QWidget):
         self.main_layout.addWidget(self.mutagenese_groupbox, 2, 1)
 
         ## SIMULATION ##
-        self.simulation_groupbox = QGroupBox('Simulation')
+        self.simulation_groupbox = QGroupBox("Simulation")
         simulation_layout = QGridLayout()
         self.simulation_groupbox.setLayout(simulation_layout)
 
         # GENERATION #
-        self.generation_label = QLabel('Generation: ')
+        self.generation_label = QLabel("Generation: ")
         simulation_layout.addWidget(self.generation_label, 0, 0)
         self.generation_edit = QLineEdit()
         self.generation_edit.setText("1e6")
         simulation_layout.addWidget(self.generation_edit, 0, 1)
 
         # POPULATION SIZE #
-        self.population_size_label = QLabel('Population size: ')
+        self.population_size_label = QLabel("Population size: ")
         simulation_layout.addWidget(self.population_size_label, 1, 0)
         self.population_size_edit = QLineEdit()
         self.population_size_edit.setText("1e3")
@@ -300,12 +305,10 @@ class ConfigGenerator(QWidget):
 
         self.main_layout.addWidget(self.simulation_groupbox, 3, 0)
 
-
         ## GENERATION BUTTON ##
-        self.generate_button = QPushButton('Generate configuration file')
+        self.generate_button = QPushButton("Generate configuration file")
         self.generate_button.clicked.connect(self.generate_config)
         self.main_layout.addWidget(self.generate_button, 4, 0, 2, 2)
-
 
         ## SCROLL BAR ##
         scroll_area = QScrollArea()
@@ -318,20 +321,27 @@ class ConfigGenerator(QWidget):
         self.handle_experiment_change()
 
     def generate_ticked_list(self):
-        mutation_types = ["Point mutation", "Small insertion", "Small deletion", "Deletion", "Duplication", "Inversion"]
+        mutation_types = [
+            "Point mutation",
+            "Small insertion",
+            "Small deletion",
+            "Deletion",
+            "Duplication",
+            "Inversion",
+        ]
         model = QStandardItemModel()
         for mutation_type in mutation_types:
             item = QStandardItem(mutation_type)
             item.setCheckable(True)
             model.appendRow(item)
         return model
-    
+
     def variable_change(self):
         if self.variable_combo.currentText() != "No variable":
             self.range_widget.setEnabled(True)
         else:
             self.range_widget.setEnabled(False)
-    
+
     def auto_z_c_change(self, state):
         if state == QtCore.Qt.Checked:
             self.z_c_edit.setEnabled(False)
@@ -339,7 +349,7 @@ class ConfigGenerator(QWidget):
         else:
             self.z_c_edit.setEnabled(True)
             self.z_c_factor_edit.setEnabled(False)
-    
+
     def auto_z_nc_change(self, state):
         if state == QtCore.Qt.Checked:
             self.z_nc_edit.setEnabled(False)
@@ -347,7 +357,7 @@ class ConfigGenerator(QWidget):
         else:
             self.z_nc_edit.setEnabled(True)
             self.z_nc_factor_edit.setEnabled(False)
-    
+
     def handle_experiment_change(self):
         experiment_type = self.experiment_type_combo.currentText()
         experiment_name = self.experiment_name_edit.text()
@@ -371,9 +381,12 @@ class ConfigGenerator(QWidget):
         else:
             for index in range(self.main_layout.count()):
                 item = self.main_layout.itemAt(index)
-                if isinstance(item.widget(), QWidget) and item.widget() != self.experiment_groupbox:
+                if (
+                    isinstance(item.widget(), QWidget)
+                    and item.widget() != self.experiment_groupbox
+                ):
                     item.widget().setEnabled(False)
-    
+
     def generate_config(self):
         d_params = {}
 
@@ -382,7 +395,6 @@ class ConfigGenerator(QWidget):
             "Experiment name": self.experiment_name_edit.text(),
             "Experiment type": self.experiment_type_combo.currentText(),
         }
-        
 
         ## PATHS ##
         if self.home_dir_selected_label.text() == "":
@@ -400,9 +412,11 @@ class ConfigGenerator(QWidget):
 
         ## MUTATIONS ##
         d_params["Mutations"] = {
-            "Mutation types": [self.mutation_type_model.item(row).text() 
-                               for row in range(self.mutation_type_model.rowCount()) 
-                               if self.mutation_type_model.item(row).checkState() == QtCore.Qt.Checked],
+            "Mutation types": [
+                self.mutation_type_model.item(row).text()
+                for row in range(self.mutation_type_model.rowCount())
+                if self.mutation_type_model.item(row).checkState() == QtCore.Qt.Checked
+            ],
             "l_m": self.l_m_edit.text(),
         }
 
@@ -429,7 +443,6 @@ class ConfigGenerator(QWidget):
             "Duplication rate": self.duplications_rate_edit.text(),
             "Inversion rate": self.inversions_rate_edit.text(),
         }
-        
 
         ## MUTAGENESE ##
         d_params["Mutagenese"] = {
@@ -456,19 +469,21 @@ class ConfigGenerator(QWidget):
             with open(save_file, "w", encoding="utf8") as f:
                 json.dump(d_params, f, indent=2)
 
-                self.info_box("The configuration file was successfully generated at:\n"
-                              f"{save_file}")
+                self.info_box(
+                    "The configuration file was successfully generated at:\n"
+                    f"{save_file}"
+                )
 
     def open_directory_dialog(self, param):
         directory_path = QFileDialog.getExistingDirectory(self, "Select Directory")
         if directory_path:
             param.setText(directory_path)
-    
+
     def open_save_directory_dialog(self, param):
         directory_path = QFileDialog.getExistingDirectory(self, "Select Directory")
         if directory_path:
             param.setText(f"{directory_path}/{self.experiment_name_edit.text()}")
-    
+
     def error_box(self, message):
         msgBox = QMessageBox()
         msgBox.setIcon(QMessageBox.Critical)
@@ -485,9 +500,9 @@ class ConfigGenerator(QWidget):
         msgBox.setStandardButtons(QMessageBox.Ok)
         msgBox.exec()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = ConfigGenerator()
     window.show()
     sys.exit(app.exec_())
-

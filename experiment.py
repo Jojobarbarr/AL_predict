@@ -33,9 +33,10 @@ YLIMITS_NEAUTRALITY = {
         "Small deletion": (0, 0.6),
         "Deletion": (0, 0.015),
         "Duplication": (0, 0.03),
-        "Inversion": (0, 0.03)
+        "Inversion": (0, 0.03),
     },
 }
+
 
 class Experiment:
     def __init__(self, config: configparser.ConfigParser):
@@ -45,7 +46,6 @@ class Experiment:
         self.mutation_rates_config = config["Mutation rates"]
         self.mutagenese_config = config["Mutagenese"]
         self.simulation_config = config["Simulation"]
-        
 
         self.home_dir = Path(config["Paths"]["Home directory"])
         self.save_path = Path(config["Paths"]["Save directory"])
@@ -53,6 +53,3 @@ class Experiment:
 
     def save_population(self, filename: str):
         pass
-
-
-

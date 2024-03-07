@@ -14,8 +14,10 @@ L_M = {
     "Small deletion",
 }
 
+
 def str_to_int(string: str) -> int:
     return int(float(string))
+
 
 def str_to_bool(string: str) -> bool:
     return string.lower() in {"true", "on", "1", "yes"}
