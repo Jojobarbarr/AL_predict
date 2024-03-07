@@ -18,6 +18,24 @@ PROFILE = False
 
 
 class Simulation(Experiment):
+    """Handles the simulation experience.
+
+    Attributes:
+        generations (int): number of generations.
+        plot_point (int): number of generations between two plots.
+        population (int): number of individuals in the population.
+        checkpoint (int): number of generations between two checkpoints.
+        genomes (npt.NDArray[np.object_]): array of genomes.
+        vec_genome_length (np.vectorize): vectorized version of the genome_length method.
+        vec_blend_genomes (np.vectorize): vectorized version of the blend_genomes method.
+        vec_clone (np.vectorize): vectorized version of the clone method.
+        num_workers (int): number of workers for multiprocessing.
+        mutation_rates (npt.NDArray[np.float32]): mutation rates.
+        total_mutation_rate (float): sum of the mutation rates.
+        biases_mutation (npt.NDArray[np.float32]): biases for the mutation rates.
+        mutations (npt.NDArray[Mutation]): array of mutations.
+    """
+
     def __init__(self, config: ConfigParser, load_file: Path = Path("")) -> None:
         """Simulation initialization.
 
@@ -43,7 +61,7 @@ class Simulation(Experiment):
         self.population = str_to_int(self.simulation_config["Population size"])
 
         self.init_mutations()
-
+        self.genomes = np.empty(self.population, dtype=Genome)
         if self.checkpoints_path == Path(""):
             self.init_genomes(load_file)
 
@@ -102,10 +120,10 @@ class Simulation(Experiment):
                 with open(load_file, "rb") as pkl_file:
                     self.genomes = pkl.load(pkl_file)
                 print(f"Population {load_file} loaded")
-            except FileNotFoundError:
+            except FileNotFoundError as exc:
                 raise FileNotFoundError(
                     f"File {load_file} not found. Please provide a valid file."
-                )
+                ) from exc
         else:
             print("Creating population")
             self.generate_genomes()
@@ -625,7 +643,6 @@ class Simulation(Experiment):
 
             living_percentage = living_genomes.sum() / self.population * 100
 
-            # TODO: Maybe possible to optimize but must be careful here: both structure change genome and dead genome affects the statistics.
             z_nc_list = sorted([genome.z_nc for genome in self.genomes[living_genomes]])
             z_nc_min = z_nc_list[0]
             z_nc_max = z_nc_list[-1]
@@ -732,7 +749,6 @@ class Simulation(Experiment):
                     0.50005,
                     1000,
                     "Non coding proportion",
-                    f"Non coding proportion",
                     self.save_path / "generation_plots",
                 )
                 genomes_non_coding_proportion_means[index] = (
@@ -759,7 +775,6 @@ class Simulation(Experiment):
                     1050,
                     1000,
                     "Genomes non coding lengths",
-                    f"Genomes non coding lengths",
                     self.save_path / "generation_plots",
                 )
                 genomes_nc_lengths_means[index] = genomes_nc_lengths_mean
@@ -776,7 +791,6 @@ class Simulation(Experiment):
                     1e6 + 100,
                     500,
                     "Population z_nc",
-                    f"Population z_nc",
                     self.save_path / "generation_plots",
                 )
                 population_z_ncs[index] = population_z_nc

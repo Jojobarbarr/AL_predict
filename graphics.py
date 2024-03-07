@@ -88,7 +88,7 @@ def plot_simulation(
 
 
 def plot_generation(
-    statistics, generation, min, max, ymax, xlabel, name, save_path: Path
+    statistics, generation, min, max, ymax, name, save_path: Path
 ):
     save_path.mkdir(parents=True, exist_ok=True)
     save_path_fixed = save_path / "fixed"
@@ -96,7 +96,7 @@ def plot_generation(
     plt.clf()
     plt.hist(statistics, bins=100)
     plt.title(f"{name} for generation {generation}")
-    plt.xlabel(f"{xlabel}")
+    plt.xlabel(f"{name}")
     plt.ylabel("Count")
     plt.savefig(save_path / f"{name.lower().replace(' ', '_')}_{generation}.jpg")
 
@@ -104,7 +104,7 @@ def plot_generation(
         plt.clf()
         plt.hist(statistics, bins=100, range=(min, max))
         plt.title(f"{name} for generation {generation}")
-        plt.xlabel(f"{xlabel}")
+        plt.xlabel(f"{name}")
         plt.ylabel("Count")
         plt.ylim(0, ymax)
         plt.savefig(
