@@ -15,9 +15,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          persist-credentials: false # otherwise, the token used is the GITHUB_TOKEN, instead of your personal access token.
-          fetch-depth: 0 # otherwise, there would be errors pushing refs to the destination repository.
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -33,11 +30,11 @@ jobs:
       - name: Format code with Black
         run: black .
         
-      - name: Commit changes
+      - name: Commit and push changes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --list
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
-          git add .
-          git commit -m "Auto-format Python code with Black"
-          git push 
+          git commit -am "Reformat code using black"
+          git push --force --quiet https://${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
