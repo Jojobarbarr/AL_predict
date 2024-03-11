@@ -78,34 +78,34 @@ class TestGenome(unittest.TestCase):
     def test_init_genome(self):
         with patch("random.sample", return_value=[2, 3]):
             genome = Genome(2, 6, 4)
-        self.assertListEqual(genome.loci.tolist(), [3, 7])
+        self.assertListEqual(genome.loci.tolist(), [2, 5])
 
     def test_compute_intervals(self):
         with patch("random.sample", return_value=[1, 3, 4, 10, 15, 22, 30, 32, 33, 40]):
             genome = Genome(10, 100, 50)
         self.assertListEqual(
-            genome.loci.tolist(), [2, 14, 25, 41, 56, 73, 91, 103, 114, 131]
+            genome.loci.tolist(), [1, 12, 22, 37, 51, 67, 84, 95, 105, 121]
         )
         genome.compute_intervals()
         self.assertListEqual(
-            genome.loci_interval.tolist(), [2, 1, 6, 5, 7, 8, 2, 1, 7, 11]
+            genome.loci_interval.tolist(), [1, 0, 5, 4, 6, 7, 1, 0, 6, 20]
         )
 
     @parameterized.expand(
         [
             (0, 0),
             (1, 0),
-            (2, 0),
+            (2, 1),
             (3, 1),
-            (22, 5),
-            (51, 10),
+            (4, 2),
+            (48, 10),
         ]
     )
     def test_insertion_binary_search(self, input_value, expected_result):
         with patch("random.sample", return_value=[1, 3, 4, 10, 15, 22, 30, 32, 33, 40]):
             genome = Genome(10, 100, 50)
         self.assertListEqual(
-            genome.loci.tolist(), [2, 14, 25, 41, 56, 73, 91, 103, 114, 131]
+            genome.loci.tolist(), [1, 12, 22, 37, 51, 67, 84, 95, 105, 121]
         )
         result = genome.insertion_binary_search(input_value)
         self.assertEqual(result, expected_result)
@@ -113,8 +113,8 @@ class TestGenome(unittest.TestCase):
     @parameterized.expand(
         [
             (0, 0),
-            (1, 0),
-            (2, 1),
+            (1, 1),
+            (2, 3),
             (16, 5),
             (41, 10),
         ]
@@ -131,31 +131,31 @@ class TestGenome(unittest.TestCase):
             (1, 0),
             (2, 1),
             (52, 5),
-            (122, 10),
+            (133, 10),
         ]
     )
     def test_duplication_binary_search(self, input_value, expected_result):
         with patch("random.sample", return_value=[1, 3, 4, 10, 15, 22, 30, 32, 33, 40]):
             genome = Genome(10, 100, 50)
             self.assertListEqual(
-                genome.loci.tolist(), [2, 14, 25, 41, 56, 73, 91, 103, 114, 131]
+                genome.loci.tolist(), [1, 12, 22, 37, 51, 67, 84, 95, 105, 121]
             )
             result = genome.duplication_binary_search(input_value)
             self.assertEqual(result, expected_result)
 
     @parameterized.expand(
         [
-            ((0, 1), [3, 15, 26, 42, 57, 74, 92, 104, 115, 132]),
-            ((0, 4), [6, 18, 29, 45, 60, 77, 95, 107, 118, 135]),
-            ((3, 2), [2, 14, 25, 43, 58, 75, 93, 105, 116, 133]),
-            ((10, 3), [2, 14, 25, 41, 56, 73, 91, 103, 114, 131]),
+            ((0, 1), [2, 13, 23, 38, 52, 68, 85, 96, 106, 122]),
+            ((0, 4), [5, 16, 26, 41, 55, 71, 88, 99, 109, 125]),
+            ((3, 2), [1, 12, 22, 39, 53, 69, 86, 97, 107, 123]),
+            ((10, 3), [1, 12, 22, 37, 51, 67, 84, 95, 105, 121]),
         ]
     )
     def test_insert(self, input_values, expected_result):
         with patch("random.sample", return_value=[1, 3, 4, 10, 15, 22, 30, 32, 33, 40]):
             genome = Genome(10, 100, 50)
         self.assertListEqual(
-            genome.loci.tolist(), [2, 14, 25, 41, 56, 73, 91, 103, 114, 131]
+            genome.loci.tolist(), [1, 12, 22, 37, 51, 67, 84, 95, 105, 121]
         )
         previous_length = genome.length
         genome.insert(*input_values)
@@ -166,32 +166,32 @@ class TestGenome(unittest.TestCase):
         [
             (
                 (0, 1),
-                [2, 14, 25, 41, 56, 73, 91, 103, 114, 131],
+                [1, 12, 22, 37, 51, 67, 84, 95, 105, 121],
                 [1, 1, -1, -1, 1, -1, -1, 1, 1, -1],
             ),
             (
-                (2, 10),
-                [2, 14, 25, 41, 56, 73, 91, 103, 114, 131],
+                (1, 10),
+                [1, 12, 22, 37, 51, 67, 84, 95, 105, 121],
                 [-1, 1, -1, -1, 1, -1, -1, 1, 1, -1],
             ),
             (
                 (1, 11),
-                [1, 14, 25, 41, 56, 73, 91, 103, 114, 131],
+                [2, 12, 22, 37, 51, 67, 84, 95, 105, 121],
                 [-1, 1, -1, -1, 1, -1, -1, 1, 1, -1],
             ),
             (
-                (37, 90),
-                [2, 14, 25, 40, 51, 63, 81, 98, 113, 131],
-                [1, 1, -1, -1, -1, 1, 1, -1, 1, -1],
+                (22, 97),
+                [1, 12, 26, 36, 47, 64, 80, 94, 109, 121],
+                [1, 1, -1, -1, 1, 1, -1, 1, 1, -1],
             ),
             (
                 (132, 3),
-                [2, 14, 25, 41, 56, 73, 91, 103, 114, 131],
+                [1, 12, 22, 37, 51, 67, 84, 95, 105, 121],
                 [1, 1, -1, -1, 1, -1, -1, 1, 1, -1],
             ),
             (
-                (83, 7),
-                [2, 14, 25, 41, 56, 73, 91, 103, 114, 131],
+                (77, 7),
+                [1, 12, 22, 37, 51, 67, 84, 95, 105, 121],
                 [1, 1, -1, -1, 1, -1, -1, 1, 1, -1],
             ),
         ]
@@ -205,7 +205,7 @@ class TestGenome(unittest.TestCase):
             [1, 1, -1, -1, 1, -1, -1, 1, 1, -1], dtype=np.int_
         )
         self.assertListEqual(
-            genome.loci.tolist(), [2, 14, 25, 41, 56, 73, 91, 103, 114, 131]
+            genome.loci.tolist(), [1, 12, 22, 37, 51, 67, 84, 95, 105, 121]
         )
         genome.inverse(*input_values)
         self.assertListEqual(genome.loci.tolist(), expected_result_loci)
@@ -215,18 +215,16 @@ class TestGenome(unittest.TestCase):
 
     @parameterized.expand(
         [
-            ((0, 1), [1, 13, 24, 40, 55, 72, 90, 102, 113, 130]),
-            ((1, 1), [1, 13, 24, 40, 55, 72, 90, 102, 113, 130]),
-            ((2, 1), [2, 13, 24, 40, 55, 72, 90, 102, 113, 130]),
-            ((66, 5), [2, 14, 25, 41, 56, 68, 86, 98, 109, 126]),
-            ((132, 3), [2, 14, 25, 41, 56, 73, 91, 103, 114, 131]),
+            ((0, 1), [0, 11, 21, 36, 50, 66, 83, 94, 104, 120]),
+            ((48, 2), [1, 12, 22, 37, 49, 65, 82, 93, 103, 119]),
+            ((132, 3), [1, 12, 22, 37, 51, 67, 84, 95, 105, 121]),
         ]
     )
     def test_delete(self, input_values, expected_result):
         with patch("random.sample", return_value=[1, 3, 4, 10, 15, 22, 30, 32, 33, 40]):
             genome = Genome(10, 100, 50)
         self.assertListEqual(
-            genome.loci.tolist(), [2, 14, 25, 41, 56, 73, 91, 103, 114, 131]
+            genome.loci.tolist(), [1, 12, 22, 37, 51, 67, 84, 95, 105, 121]
         )
         previous_length = genome.length
         genome.delete(*input_values)
@@ -237,7 +235,7 @@ class TestGenome(unittest.TestCase):
         with patch("random.sample", return_value=[1, 3, 4, 10, 15, 22, 30, 32, 33, 40]):
             genome = Genome(10, 100, 50)
         self.assertListEqual(
-            genome.loci.tolist(), [2, 14, 25, 41, 56, 73, 91, 103, 114, 131]
+            genome.loci.tolist(), [1, 12, 22, 37, 51, 67, 84, 95, 105, 121]
         )
         genome.blend()
         self.assertListEqual(
@@ -248,7 +246,7 @@ class TestGenome(unittest.TestCase):
         with patch("random.sample", return_value=[1, 3, 4, 10, 15, 22, 30, 32, 33, 40]):
             genome = Genome(10, 100, 53)
         self.assertListEqual(
-            genome.loci.tolist(), [2, 14, 25, 41, 56, 73, 91, 103, 114, 131]
+            genome.loci.tolist(), [1, 12, 22, 37, 51, 67, 84, 95, 105, 121]
         )
         with patch("random.sample", return_value=[0, 1, 9]):
             genome.blend()
