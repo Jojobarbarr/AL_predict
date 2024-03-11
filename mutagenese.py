@@ -35,8 +35,6 @@ class Mutagenese(Experiment):
     def run(
         self,
         only_plot: bool = False,
-        multiprocessing: bool = False,
-        skip_generation_plots: bool = False,
     ):
         if not only_plot:
             if self.variable == "No variable":

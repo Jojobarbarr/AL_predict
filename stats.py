@@ -47,7 +47,6 @@ class MutationStatistics(Statistics):
             self.length_square_sum, self.neutral_count, lenght_mean
         )
         length_mean_std = self.mean_estimator_variance(length_std, self.neutral_count)
-
         self.d_stats = {
             "Total mutations": self.count,
             "Neutral mutations": self.neutral_count,

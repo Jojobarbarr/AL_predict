@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
+import matplotlib
 
+matplotlib.use("agg")
 import matplotlib.pyplot as plt
 import pickle as pkl
 import numpy.typing as npt
@@ -79,7 +81,7 @@ def plot_simulation(
     save_path.mkdir(parents=True, exist_ok=True)
     plt.clf()
     plt.plot(x_value, y_value, marker="o", label="Estimation")
-    # plt.errorbar(x_value, y_value, std_values, linestyle='None', marker='o')
+    # plt.errorbar(x_value, y_value, std_values, linestyle="None", marker="o")
     plt.title(f"{name} over generations")
     plt.xlabel("Generation")
     plt.ylabel(f"{name}")
@@ -87,24 +89,49 @@ def plot_simulation(
     plt.savefig(save_path / f"{name.lower().replace(' ', '_')}.jpg")
 
 
-def plot_generation(statistics, generation, min, max, ymax, name, save_path: Path):
+def plot_generation(
+    statistics,
+    generation,
+    min,
+    max,
+    ymax,
+    name,
+    save_path: Path,
+):
     save_path.mkdir(parents=True, exist_ok=True)
     save_path_fixed = save_path / "fixed"
     save_path_fixed.mkdir(parents=True, exist_ok=True)
-    plt.clf()
-    plt.hist(statistics, bins=100)
-    plt.title(f"{name} for generation {generation}")
-    plt.xlabel(f"{name}")
-    plt.ylabel("Count")
-    plt.savefig(save_path / f"{name.lower().replace(' ', '_')}_{generation}.jpg")
+    fig, ax = plt.subplots()
+    ax.hist(statistics, bins=100)
+    ax.set_title(f"{name} for generation {generation}")
+    ax.set_xlabel(f"{name}")
+    ax.set_ylabel("Count")
+    fig.savefig(save_path / f"{name.lower().replace(' ', '_')}_{generation}.jpg")
+    plt.close(fig)
 
-    if min != 0 or max != 0:
-        plt.clf()
-        plt.hist(statistics, bins=100, range=(min, max))
-        plt.title(f"{name} for generation {generation}")
-        plt.xlabel(f"{name}")
-        plt.ylabel("Count")
-        plt.ylim(0, ymax)
-        plt.savefig(
-            save_path_fixed / f"{name.lower().replace(' ', '_')}_{generation}.jpg"
-        )
+    # if min != 0 or max != 0:
+    #     plt.clf()
+    #     plt.hist(statistics, bins=100, range=(min, max))
+    #     plt.title(f"{name} for generation {generation}")
+    #     plt.xlabel(f"{name}")
+    #     plt.ylabel("Count")
+    #     plt.ylim(0, ymax)
+    #     plt.savefig(
+    #         save_path_fixed / f"{name.lower().replace(' ', '_')}_{generation}.jpg"
+    #     )
+
+
+def plot_mutation_info(
+    dict_mutation_info: dict[str, dict],
+    save_path: Path,
+    key: str,
+    suffix: str = "",
+):
+    plt.clf()
+    x = [str(mutation) for mutation in dict_mutation_info.keys()]
+    y = [value[key] for value in dict_mutation_info.values()]
+    plt.plot(x, y, linestyle="None", marker="o")
+    plt.title(f"{key} per mutation type")
+    plt.xlabel("Mutation type")
+    plt.ylabel(key)
+    plt.savefig(save_path / f"{key.lower().replace(' ', '_')}{suffix}.jpg")

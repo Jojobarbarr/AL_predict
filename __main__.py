@@ -1,11 +1,14 @@
 import argparse
 import json
 from pathlib import Path
+import matplotlib.pyplot as plt
+
 
 from mutagenese import Mutagenese
 from simulation import Simulation
 
 if __name__ == "__main__":
+    plt.rcParams.update({"figure.max_open_warning": 0})
     arg_parser = argparse.ArgumentParser(
         prog="AL_predict",
         description="Evolution model from a math model over genome structure.",
@@ -57,11 +60,8 @@ if __name__ == "__main__":
         experiment = Mutagenese(config)
     elif config["Experiment"]["Experiment type"] == "Simulation":
         experiment = Simulation(config, args.load)
-
     if args.save:
         experiment.save_population("initial_population.pkl")
     experiment.run(
         only_plot=args.only_plot,
-        multiprocessing=args.multiprocessing,
-        skip_generation_plots=args.skip_generation_plots,
     )

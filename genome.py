@@ -71,10 +71,10 @@ class Genome:
         if not self.homogeneous:
             # To create non homogeneous genome, we start from a non coding genome.
             # g random locus of insertion are selected, and the genes are inserted.
-            loci_of_insertion = sorted(rd.sample(range(0, self.z_nc), self.g))
+            loci_of_insertion = sorted(rd.sample(range(0, self.z_nc + self.g), self.g))
             loci = np.array(
                 [
-                    locus + (segment * self.gene_length) + 1
+                    locus + segment * (self.gene_length - 1)
                     for segment, locus in enumerate(loci_of_insertion)
                 ],
                 dtype=np.int_,
