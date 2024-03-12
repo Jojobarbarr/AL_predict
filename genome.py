@@ -130,7 +130,7 @@ class Genome:
         left, right = 0, len(self.loci) - 1
         while left <= right:
             middle = (left + right) // 2
-            if self.loci[middle] <= target + middle - 1:
+            if self.loci[middle] <= target + middle:
                 left = middle + 1
             else:
                 right = middle - 1

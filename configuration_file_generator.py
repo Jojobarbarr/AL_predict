@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import sys
 
 import PyQt5.QtCore as QtCore
@@ -19,6 +20,8 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from utils import str_to_int
 
 
 class ConfigGenerator(QWidget):
@@ -62,38 +65,44 @@ class ConfigGenerator(QWidget):
         paths_layout = QGridLayout()
         self.paths_groupbox.setLayout(paths_layout)
 
-        # HOME DIRECTORY
-        self.home_dir_label = QLabel("Home directory: ")
-        paths_layout.addWidget(self.home_dir_label, 0, 0)
-        self.home_dir_selected_label = QLabel()
-        paths_layout.addWidget(self.home_dir_selected_label, 0, 1)
-        self.select_home_directory_button = QPushButton("Select Directory")
-        self.select_home_directory_button.clicked.connect(
-            lambda: self.open_directory_dialog(self.home_dir_selected_label)
-        )
-        paths_layout.addWidget(self.select_home_directory_button, 0, 2)
-
         # SAVE DIRECTORY
         self.save_dir_label = QLabel("Save directory: ")
-        paths_layout.addWidget(self.save_dir_label, 1, 0)
+        paths_layout.addWidget(self.save_dir_label, 0, 0)
         self.save_dir_selected_label = QLabel()
-        paths_layout.addWidget(self.save_dir_selected_label, 1, 1)
+        paths_layout.addWidget(self.save_dir_selected_label, 0, 1, 1, 3)
         self.select_save_directory_button = QPushButton("Select Directory")
         self.select_save_directory_button.clicked.connect(
             lambda: self.open_save_directory_dialog(self.save_dir_selected_label)
         )
-        paths_layout.addWidget(self.select_save_directory_button, 1, 2)
+        paths_layout.addWidget(self.select_save_directory_button, 0, 4)
+
+        # CHECKPOINT BOX
+        self.checkpoint_label = QLabel("Enable checkpointing: ")
+        paths_layout.addWidget(self.checkpoint_label, 1, 0)
+        self.checkpoint_checkbox = QCheckBox()
+        paths_layout.addWidget(self.checkpoint_checkbox, 1, 1)
+        self.checkpoint_checkbox.stateChanged.connect(self.handle_checkpoint_change)
+
+        # CHECKPOINT NUMBER
+        self.checkpoint_number_label = QLabel("Checkpoint number: ")
+        paths_layout.addWidget(self.checkpoint_number_label, 1, 2)
+        self.checkpoint_number_edit = QLineEdit()
+        self.checkpoint_number_edit.setText("100")
+        self.checkpoint_number_edit.textChanged.connect(self.handle_checkpoint_change)
+        paths_layout.addWidget(self.checkpoint_number_edit, 1, 3)
+        self.checkpoint_number_label_suffix = QLabel(f"")
+        paths_layout.addWidget(self.checkpoint_number_label_suffix, 1, 4)
 
         # CHECKPOINT DIRECTORY
         self.checkpoint_dir_label = QLabel("Checkpoint directory: ")
         paths_layout.addWidget(self.checkpoint_dir_label, 2, 0)
         self.checkpoint_dir_selected_label = QLabel()
-        paths_layout.addWidget(self.checkpoint_dir_selected_label, 2, 1)
+        paths_layout.addWidget(self.checkpoint_dir_selected_label, 2, 1, 1, 3)
         self.select_checkpoint_directory_button = QPushButton("Select Directory")
         self.select_checkpoint_directory_button.clicked.connect(
             lambda: self.open_directory_dialog(self.checkpoint_dir_selected_label)
         )
-        paths_layout.addWidget(self.select_checkpoint_directory_button, 2, 2)
+        paths_layout.addWidget(self.select_checkpoint_directory_button, 2, 4)
 
         self.main_layout.addWidget(self.paths_groupbox, 0, 1)
 
@@ -106,6 +115,9 @@ class ConfigGenerator(QWidget):
         self.mutation_type_list = QListView()
         self.mutation_type_model = self.generate_ticked_list()
         self.mutation_type_list.setModel(self.mutation_type_model)
+        self.mutation_type_model.itemChanged.connect(
+            self.handle_mutation_selection_change
+        )
         mutations_layout.addWidget(self.mutation_type_list, 0, 0, 1, 2)
 
         # L_M
@@ -230,6 +242,15 @@ class ConfigGenerator(QWidget):
         self.inversions_rate_edit.setText("1e-9")
         mutation_rates_layout.addWidget(self.inversions_rate_edit, 5, 1)
 
+        self.rate_edit_list = [
+            self.point_mutations_rate_edit,
+            self.small_insertions_rate_edit,
+            self.small_deletions_rate_edit,
+            self.deletions_rate_edit,
+            self.duplications_rate_edit,
+            self.inversions_rate_edit,
+        ]
+
         self.main_layout.addWidget(self.mutation_rates_groupbox, 2, 0)
 
         ## MUTAGENESE ##
@@ -282,26 +303,33 @@ class ConfigGenerator(QWidget):
         simulation_layout = QGridLayout()
         self.simulation_groupbox.setLayout(simulation_layout)
 
+        # REPLICATION MODEL #
+        self.replication_model_label = QLabel("Replication model: ")
+        simulation_layout.addWidget(self.replication_model_label, 0, 0)
+        self.replication_model_combo = QComboBox()
+        self.replication_model_combo.addItems(["Wright-Fisher", "Moran"])
+        simulation_layout.addWidget(self.replication_model_combo, 0, 1)
+
         # GENERATION #
         self.generation_label = QLabel("Generation: ")
-        simulation_layout.addWidget(self.generation_label, 0, 0)
+        simulation_layout.addWidget(self.generation_label, 1, 0)
         self.generation_edit = QLineEdit()
         self.generation_edit.setText("1e6")
-        simulation_layout.addWidget(self.generation_edit, 0, 1)
+        simulation_layout.addWidget(self.generation_edit, 1, 1)
 
         # POPULATION SIZE #
         self.population_size_label = QLabel("Population size: ")
-        simulation_layout.addWidget(self.population_size_label, 1, 0)
+        simulation_layout.addWidget(self.population_size_label, 2, 0)
         self.population_size_edit = QLineEdit()
         self.population_size_edit.setText("1e3")
-        simulation_layout.addWidget(self.population_size_edit, 1, 1)
+        simulation_layout.addWidget(self.population_size_edit, 2, 1)
 
         # PLOT POINTS #
         self.plot_points_label = QLabel("Plot points: ")
-        simulation_layout.addWidget(self.plot_points_label, 2, 0)
+        simulation_layout.addWidget(self.plot_points_label, 3, 0)
         self.plot_points_edit = QLineEdit()
         self.plot_points_edit.setText("10")
-        simulation_layout.addWidget(self.plot_points_edit, 2, 1)
+        simulation_layout.addWidget(self.plot_points_edit, 3, 1)
 
         self.main_layout.addWidget(self.simulation_groupbox, 3, 0)
 
@@ -333,6 +361,7 @@ class ConfigGenerator(QWidget):
         for mutation_type in mutation_types:
             item = QStandardItem(mutation_type)
             item.setCheckable(True)
+            item.setCheckState(QtCore.Qt.Checked)
             model.appendRow(item)
         return model
 
@@ -363,15 +392,25 @@ class ConfigGenerator(QWidget):
         experiment_name = self.experiment_name_edit.text()
 
         if experiment_name != "":
+            self.handle_checkpoint_change()
+            self.experiment_type_combo.setEnabled(True)
             for index in range(self.main_layout.count()):
                 item = self.main_layout.itemAt(index)
                 if isinstance(item.widget(), QWidget):
                     item.widget().setEnabled(True)
+
             if experiment_type == "Mutagenese":
                 self.mutation_rates_groupbox.setEnabled(False)
                 self.simulation_groupbox.setEnabled(False)
+                self.save_dir_selected_label.setText(
+                    str(Path(__file__).parent / "results/mutagenese" / experiment_name)
+                )
             elif experiment_type == "Simulation":
                 self.mutagenese_groupbox.setEnabled(False)
+                self.simulation_groupbox.setEnabled(True)
+                self.save_dir_selected_label.setText(
+                    str(Path(__file__).parent / "results/simulation" / experiment_name)
+                )
             if self.variable_combo.currentText() == "No variable":
                 self.range_widget.setEnabled(False)
             if not self.auto_z_c_checkbox.isChecked:
@@ -379,6 +418,7 @@ class ConfigGenerator(QWidget):
             if not self.auto_z_nc_checkbox.isChecked:
                 self.z_nc_factor_edit.setEnabled(False)
         else:
+            self.experiment_type_combo.setEnabled(False)
             for index in range(self.main_layout.count()):
                 item = self.main_layout.itemAt(index)
                 if (
@@ -392,22 +432,37 @@ class ConfigGenerator(QWidget):
 
         ## EXPERIMENT
         d_params["Experiment"] = {
-            "Experiment name": self.experiment_name_edit.text(),
-            "Experiment type": self.experiment_type_combo.currentText(),
+            "Name": self.experiment_name_edit.text(),
+            "Type": self.experiment_type_combo.currentText(),
         }
 
         ## PATHS ##
-        if self.home_dir_selected_label.text() == "":
-            self.error_box("Please provide a home directory.")
-            return None
         if self.save_dir_selected_label.text() == "":
-            self.error_box("Please provide a save directory.")
+            self.error_box("Please provide a valid save directory.")
             return None
 
+        if self.checkpoint_checkbox.isChecked():
+            checkpoint_number = self.checkpoint_number_edit.text()
+            if checkpoint_number == "":
+                try:
+                    checkpoint_number = str_to_int(checkpoint_number)
+                except ValueError:
+                    self.error_box(
+                        f"Please provide a valid checkpoint number. (Yours is {checkpoint_number})"
+                    )
+                    return None
+            if checkpoint_number == 0:
+                self.info_box("The checkpoint number can't be 0. Defaulting to 1.")
+                checkpoint_number = 1
+            elif self.checkpoint_dir_selected_label.text() == "":
+                self.error_box("Please provide a valid checkpoint directory.")
+                return None
+
         d_params["Paths"] = {
-            "Home directory": self.home_dir_selected_label.text(),
-            "Save directory": self.save_dir_selected_label.text(),
-            "Checkpoint directory": self.checkpoint_dir_selected_label.text(),
+            "Save": self.save_dir_selected_label.text(),
+            "Checkpointing": self.checkpoint_checkbox.isChecked(),
+            "Checkpoint number": checkpoint_number,
+            "Checkpoint": self.checkpoint_dir_selected_label.text(),
         }
 
         ## MUTATIONS ##
@@ -420,44 +475,117 @@ class ConfigGenerator(QWidget):
             "l_m": self.l_m_edit.text(),
         }
 
+        def var_is_ok(var):
+            try:
+                str_to_int(var)
+            except ValueError:
+                self.error_box(f"Please provide a valid {var} value. (Yours is {var})")
+                return None
+
         ## GENOME ##
         g = self.g_edit.text()
+        if not var_is_ok(g):
+            return None
+        z_c = self.z_c_edit.text()
+        if not var_is_ok(z_c):
+            return None
+        z_nc = self.z_nc_edit.text()
+        if not var_is_ok(z_nc):
+            return None
+        z_c_factor = self.z_c_factor_edit.text()
+        if not var_is_ok(z_c_factor):
+            return None
+        z_nc_factor = self.z_nc_factor_edit.text()
+        if not var_is_ok(z_nc_factor):
+            return None
+
         d_params["Genome"] = {
             "g": g,
-            "z_c": self.z_c_edit.text(),
+            "z_c": z_c,
             "z_c_auto": self.auto_z_c_checkbox.isChecked(),
-            "z_c_factor": self.z_c_factor_edit.text(),
-            "z_nc": self.z_nc_edit.text(),
+            "z_c_factor": z_c_factor,
+            "z_nc": z_nc,
             "z_nc_auto": self.auto_z_nc_checkbox.isChecked(),
-            "z_nc_factor": self.z_nc_factor_edit.text(),
+            "z_nc_factor": z_nc_factor,
             "Homogeneous": self.homogeneous_checkbox.isChecked(),
             "Orientation": self.orientation_checkbox.isChecked(),
         }
 
         ## MUTATION RATES
+        point_mutations_rate = self.point_mutations_rate_edit.text()
+        if not var_is_ok(point_mutations_rate):
+            return None
+        small_insertions_rate = self.small_insertions_rate_edit.text()
+        if not var_is_ok(small_insertions_rate):
+            return None
+        small_deletions_rate = self.small_deletions_rate_edit.text()
+        if not var_is_ok(small_deletions_rate):
+            return None
+        deletions_rate = self.deletions_rate_edit.text()
+        if not var_is_ok(deletions_rate):
+            return None
+        duplications_rate = self.duplications_rate_edit.text()
+        if not var_is_ok(duplications_rate):
+            return None
+        inversions_rate = self.inversions_rate_edit.text()
+        if not var_is_ok(inversions_rate):
+            return None
+
         d_params["Mutation rates"] = {
-            "Point mutation rate": self.point_mutations_rate_edit.text(),
-            "Small insertion rate": self.small_insertions_rate_edit.text(),
-            "Small deletion rate": self.small_deletions_rate_edit.text(),
-            "Deletion rate": self.deletions_rate_edit.text(),
-            "Duplication rate": self.duplications_rate_edit.text(),
-            "Inversion rate": self.inversions_rate_edit.text(),
+            "Point mutation": point_mutations_rate,
+            "Small insertion": small_insertions_rate,
+            "Small deletion": small_deletions_rate,
+            "Deletion": deletions_rate,
+            "Duplication": duplications_rate,
+            "Inversion": inversions_rate,
         }
 
         ## MUTAGENESE ##
+        iterations = self.iterations_edit.text()
+        if not var_is_ok(iterations):
+            return None
+        range_min = self.range_min_edit.text()
+        if not var_is_ok(range_min):
+            return None
+        range_max = self.range_max_edit.text()
+        if not var_is_ok(range_max):
+            return None
+        range_step = self.range_step_edit.text()
+        if not var_is_ok(range_step):
+            return None
+
         d_params["Mutagenese"] = {
-            "Iterations": self.iterations_edit.text(),
+            "Iterations": iterations,
             "Variable": self.variable_combo.currentText(),
-            "From": self.range_min_edit.text(),
-            "To": self.range_max_edit.text(),
-            "Step": self.range_step_edit.text(),
+            "From": range_min,
+            "To": range_max,
+            "Step": range_step,
         }
 
         ## SIMULATION ##
+        generation = self.generation_edit.text()
+        if not var_is_ok(generation):
+            return None
+        population_size = self.population_size_edit.text()
+        if not var_is_ok(population_size):
+            return None
+        plot_points = self.plot_points_edit.text()
+        if not var_is_ok(plot_points):
+            return None
+        if plot_points >= generation:
+            self.error_box(
+                "The number of plot points must be smaller than the number of generations."
+            )
+            return None
+        if plot_points == 0:
+            self.info_box("The number of plot points can't be 0. Defaulting to 1.")
+            plot_points = 1
+
         d_params["Simulation"] = {
-            "Generations": self.generation_edit.text(),
-            "Population size": self.population_size_edit.text(),
-            "Plot points": self.plot_points_edit.text(),
+            "Replication model": self.replication_model_combo.currentText(),
+            "Generations": generation,
+            "Population size": population_size,
+            "Plot points": plot_points,
         }
 
         ## SAVE FILE ##
@@ -473,6 +601,43 @@ class ConfigGenerator(QWidget):
                     "The configuration file was successfully generated at:\n"
                     f"{save_file}"
                 )
+
+    def handle_checkpoint_change(self):
+        if self.checkpoint_checkbox.isChecked():
+            self.checkpoint_number_edit.setEnabled(True)
+            self.checkpoint_dir_selected_label.setEnabled(True)
+            self.checkpoint_dir_selected_label.setText(
+                str(
+                    Path(__file__).parent
+                    / "checkpoint"
+                    / self.experiment_type_combo.currentText().lower()
+                    / self.experiment_name_edit.text()
+                )
+            )
+            try:
+                self.checkpoint_number_label_suffix.setText(
+                    f"(Every {str_to_int(self.generation_edit.text()) // str_to_int(self.checkpoint_number_edit.text())} generations)"
+                )
+            except (ValueError, ZeroDivisionError):
+                self.checkpoint_number_label_suffix.setText("")
+        else:
+            self.checkpoint_number_edit.setEnabled(False)
+            self.checkpoint_dir_selected_label.setEnabled(False)
+            self.checkpoint_number_label_suffix.setText("")
+
+    def handle_mutation_selection_change(self):
+        for edit in self.rate_edit_list:
+            edit.setEnabled(False)
+        for row in range(self.mutation_type_model.rowCount()):
+            if self.mutation_type_model.item(row).checkState() == QtCore.Qt.Checked:
+                self.rate_edit_list[row].setEnabled(True)
+        if (
+            self.mutation_type_model.item(1).checkState() == QtCore.Qt.Checked
+            or self.mutation_type_model.item(2).checkState() == QtCore.Qt.Checked
+        ):
+            self.l_m_edit.setEnabled(True)
+        else:
+            self.l_m_edit.setEnabled(False)
 
     def open_directory_dialog(self, param):
         directory_path = QFileDialog.getExistingDirectory(self, "Select Directory")
