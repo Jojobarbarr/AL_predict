@@ -49,6 +49,12 @@ if __name__ == "__main__":
         action="store_true",
         help="If used, the plotting will be done during execution.",
     )
+    arg_parser.add_argument(
+        "-o",
+        "--overwrite",
+        action="store_true",
+        help="If used, the save directory will be overwritten.",
+    )
 
     args = arg_parser.parse_args()
 
@@ -59,8 +65,10 @@ if __name__ == "__main__":
         experiment = Mutagenese(config)
 
     elif config["Experiment"]["Type"] == "Simulation":
-        if config["Simulation"]["Replication model"] == "Wright-Fisher_constant_Ne":
-            experiment = WrightFisher(config, args.load, args.plot_in_time)
+        if config["Simulation"]["Replication model"] == "Wright-Fisher":
+            experiment = WrightFisher(
+                config, args.load, args.plot_in_time, args.overwrite
+            )
         else:
             experiment = Simulation(config, args.load)
 

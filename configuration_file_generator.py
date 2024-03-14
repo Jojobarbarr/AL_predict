@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from utils import str_to_int
+from utils import str_to_int, EPSILON
 
 
 class ConfigGenerator(QWidget):
@@ -440,7 +440,7 @@ class ConfigGenerator(QWidget):
         if self.save_dir_selected_label.text() == "":
             self.error_box("Please provide a valid save directory.")
             return None
-
+        checkpoint_number = 0
         if self.checkpoint_checkbox.isChecked():
             checkpoint_number = self.checkpoint_number_edit.text()
             if checkpoint_number == "":
@@ -478,9 +478,10 @@ class ConfigGenerator(QWidget):
         def var_is_ok(var):
             try:
                 str_to_int(var)
+                return True
             except ValueError:
                 self.error_box(f"Please provide a valid {var} value. (Yours is {var})")
-                return None
+                return False
 
         ## GENOME ##
         g = self.g_edit.text()
@@ -539,7 +540,6 @@ class ConfigGenerator(QWidget):
             "Duplication": duplications_rate,
             "Inversion": inversions_rate,
         }
-
         ## MUTAGENESE ##
         iterations = self.iterations_edit.text()
         if not var_is_ok(iterations):
@@ -572,12 +572,12 @@ class ConfigGenerator(QWidget):
         plot_points = self.plot_points_edit.text()
         if not var_is_ok(plot_points):
             return None
-        if plot_points >= generation:
+        if str_to_int(plot_points) - str_to_int(generation) > EPSILON:
             self.error_box(
-                "The number of plot points must be smaller than the number of generations."
+                "The number of plot points must be smaller than or equal to the number of generations."
             )
             return None
-        if plot_points == 0:
+        if str_to_int(plot_points) == 0:
             self.info_box("The number of plot points can't be 0. Defaulting to 1.")
             plot_points = 1
 

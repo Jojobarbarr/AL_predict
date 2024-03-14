@@ -1,5 +1,7 @@
 import mutations
 
+EPSILON = 1e-9
+
 MUTATIONS = {
     "Point mutation": mutations.PointMutation,
     "Small insertion": mutations.SmallInsertion,

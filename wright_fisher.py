@@ -3,6 +3,7 @@ import multiprocessing as mp
 import json
 import concurrent.futures
 import pickle as pkl
+from collections import Counter
 import random as rd
 from collections import defaultdict
 from configparser import ConfigParser
@@ -11,7 +12,7 @@ from time import perf_counter
 from multiprocessing import Process
 import numpy as np
 import numpy.typing as npt
-
+import traceback
 import graphics
 from experiment import Experiment
 from typing import Any
@@ -27,8 +28,11 @@ class WrightFisher(Simulation):
         config: dict[str, Any],
         load_file: Path = Path(""),
         plot_in_time: bool = False,
+        overwrite: bool = False,
     ):
-        super().__init__(config, load_file, plot_in_time=plot_in_time)
+        super().__init__(
+            config, load_file, plot_in_time=plot_in_time, overwrite=overwrite
+        )
         self.rng = np.random.default_rng()
         self.safety_parent_proportion = 0.99
 
@@ -64,7 +68,7 @@ class WrightFisher(Simulation):
 
             time_perfs = []
             sum_time_perfs = 0
-            if self.checkpoints_path != Path(""):
+            if self.checkpointing:
                 self.load_from_checkpoint(
                     self.simulation_config["Generation Checkpoint"]
                 )
@@ -72,157 +76,177 @@ class WrightFisher(Simulation):
             for genome in self.genomes:
                 genome.compute_stats()
             z_nc_mean = np.mean(self.vec_get_genome_z_nc(self.genomes))
+
+            plot_process = Process(
+                target=lambda: None,
+            )
             if self.plot_in_time:
-                plot_process = Process(
-                    target=lambda: None,
-                )
                 plot_process.start()
-            else:
-                plot_process = None
-            for generation in range(1, self.generations + 1):
-                start_time = perf_counter()
-                z_nc_mean, plot_process = self.generation_step(
-                    generation, z_nc_mean, plot_process
-                )
 
-                end_time = perf_counter()
-                time_perfs.append(end_time - start_time)
-                if generation % self.plot_point == 0:
-                    sum_over_last_generations = sum(time_perfs)
-                    generation_elapsed = len(time_perfs)
-                    try:
-                        average_time_perf_over_last_gens = (
-                            sum_over_last_generations / generation_elapsed
+            parent_to_child_mapping = np.zeros(self.population, dtype=np.int64)
+            try:
+                for generation in range(1, self.generations + 1):
+                    start_time = perf_counter()
+                    z_nc_mean, plot_process, parent_to_child_mapping = (
+                        self.generation_step(
+                            generation, z_nc_mean, plot_process, parent_to_child_mapping
                         )
-                    except ZeroDivisionError:
-                        average_time_perf_over_last_gens = sum_over_last_generations
-
-                    sum_time_perfs += sum_over_last_generations
-                    try:
-                        average_time_perf = sum_time_perfs / generation
-                    except ZeroDivisionError:
-                        average_time_perf = sum_time_perfs
-
-                    print(
-                        f"\nGeneration {generation}"
-                        f" - Mean elapsed time by generation: {average_time_perf:.4f} s/generation"
-                        f" - Last {generation_elapsed} generations: {average_time_perf_over_last_gens:.4f} s/generation"
                     )
-                    print(
-                        f"{self.format_time(end_time - main_start_time)} elapsed since the beginning of the simulation "
-                        f"- \033[1mEstimated remaining time: {self.format_time(average_time_perf * (self.generations - generation))}\033[0m"
-                    )
-                    time_perfs = []
+
+                    end_time = perf_counter()
+                    time_perfs.append(end_time - start_time)
+                    if generation % self.plot_point == 0:
+                        sum_over_last_generations = sum(time_perfs)
+                        generation_elapsed = len(time_perfs)
+                        try:
+                            average_time_perf_over_last_gens = (
+                                sum_over_last_generations / generation_elapsed
+                            )
+                        except ZeroDivisionError:
+                            average_time_perf_over_last_gens = sum_over_last_generations
+
+                        sum_time_perfs += sum_over_last_generations
+                        try:
+                            average_time_perf = sum_time_perfs / generation
+                        except ZeroDivisionError:
+                            average_time_perf = sum_time_perfs
+
+                        print(
+                            f"\nGeneration {generation}"
+                            f" - Mean elapsed time by generation: {average_time_perf:.4f} s/generation"
+                            f" - Last {generation_elapsed} generations: {average_time_perf_over_last_gens:.4f} s/generation"
+                        )
+                        print(
+                            f"{self.format_time(end_time - main_start_time)} elapsed since the beginning of the simulation "
+                            f"- \033[1mEstimated remaining time: {self.format_time(average_time_perf * (self.generations - generation))}\033[0m"
+                        )
+                        time_perfs = []
+            except KeyboardInterrupt:
+                print("*" * 50)
+                print(
+                    "KeyboardInterrupt while main loop execution, exiting main loop and continuing execution, next KeyboardInterrupt will stop the program"
+                )
+                print("*" * 50)
+                generation -= 1
+            except (IndexError, ValueError, ZeroDivisionError) as err:
+                print("*" * 50)
+                print("Unexpected error, trying to finish simulation...")
+                print("Error:")
+                print(err)
+                traceback.print_exc()
+                print("*" * 50)
+                generation -= 1
 
             print(f"Generation {generation} - End of simulation")
             print(f"Total time: {self.format_time(perf_counter() - main_start_time)}")
-            print(
-                f"Mean over draw: {self.over_draw_sum / self.generations}, min: {self.over_draw_min}, max: {self.over_draw_max}"
-            )
-            print(
-                f"Mean under draw: {self.under_draw_sum / self.generations}, min: {self.under_draw_min}, max: {self.under_draw_max}"
-            )
-            if self.while_loop_execution != 0:
-                print(
-                    f"Mean while loop execution: {self.while_loop_execution / self.generations}"
-                )
-                print(
-                    f"Mean while loop iteration: {self.while_loop_sum / self.while_loop_execution}"
-                )
             print(f"Mean wait time: {self.wait_time / self.plot_number}")
-        if not self.plot_in_time:
-            self.plot_simulation(self.generations)
+        self.plot_simulation(generation, only_plot)
 
     def generation_step(
         self,
         generation: int,
         z_nc_mean: float,
-        plot_process: Process | None,
-    ):
-        mutation_probability_per_genome = self.total_mutation_rate * (
+        plot_process: Process,
+        parent_to_child_mapping: np.ndarray,
+    ) -> tuple[float, Process, np.ndarray]:
+        sons = np.empty(self.population, dtype=Genome)
+        son_index: int = 0
+
+        mutation_probability_per_genome: float = self.total_mutation_rate * (
             z_nc_mean + self.z_c
         )
-        if mutation_probability_per_genome >= 1:
-            # print(
-            #     "Mutation probability per genome is greater than 1, the simulation could run indefinitely..."
-            # )
-            mutation_probability_per_genome = self.safety_parent_proportion
-        nbr_parents = int(self.population / (1 - mutation_probability_per_genome))
+        genome_changed: set[Genome] = set()
 
-        parents_indices = self.rng.choice(len(self.genomes), size=nbr_parents)
+        if mutation_probability_per_genome >= self.safety_parent_proportion:
+            mutation_probability_per_genome = self.safety_parent_proportion
+        nbr_parents: int = int(self.population / (1 - mutation_probability_per_genome))
+
+        parents_indices: np.ndarray[Any, np.dtype[np.int64]] = self.rng.choice(
+            len(self.genomes), size=nbr_parents
+        )
         living_parents_mask = np.ones(len(parents_indices), dtype=bool)
 
-        lengths = self.vec_get_genome_length(self.genomes[parents_indices])
-        total_bases_number = lengths.sum()
-        genomes_biases = lengths / total_bases_number
+        lengths: np.ndarray[Any, np.dtype[np.int64]] = self.vec_get_genome_length(
+            self.genomes[parents_indices]
+        )
+        total_bases_number: int = lengths.sum()
+        genomes_biases: np.ndarray[Any, np.dtype[np.float32]] = (
+            lengths / total_bases_number
+        )
 
-        mutation_number = self.rng.binomial(
+        mutation_number: int = self.rng.binomial(
             total_bases_number, self.total_mutation_rate
         )
-
-        # Determine which mutations happens with a biased (over mutation rate) choice with replacement.
-        mutation_events = self.rng.choice(
-            self.mutations, size=mutation_number, p=self.biases_mutation
+        mutant_parent_indices: np.ndarray[Any, np.dtype[np.int64]] = self.rng.choice(
+            parents_indices, size=mutation_number, p=genomes_biases
         )
-        # Determine which genomes are affected with a biased (over the genome length) choice with replacement.
-        mutant_genomes = self.rng.choice(
-            len(parents_indices), size=mutation_number, p=genomes_biases
-        )
-        count = 0
-        for mutation_event, parent_genome_index in zip(mutation_events, mutant_genomes):
-            if living_parents_mask[
-                parent_genome_index
-            ] and self.mutation_is_deleterious(
-                mutation_event, parents_indices[parent_genome_index]
-            ):
-                living_parents_mask[parent_genome_index] = False
-                count += 1
+        mutant_parent_indices_counter: Counter[int] = Counter(mutant_parent_indices)
+        mutation_per_genome: dict[int, np.ndarray[Any, Any]] = {
+            mutant_parent_index: self.rng.choice(self.mutations, size=mutation_applied)
+            for mutant_parent_index, mutation_applied in mutant_parent_indices_counter.items()
+        }
 
-        nbr_living_parents = living_parents_mask.sum()
-        if nbr_living_parents >= self.population:
-            self.genomes = self.vec_clone(
-                self.genomes[parents_indices[living_parents_mask][: self.population]]
+        mutant_genome_index: int
+        mutation_events: np.ndarray[Any, Any]
+        for mutant_genome_index, mutation_events in mutation_per_genome.items():
+            if self.genomes[mutant_genome_index] in genome_changed:
+                genome = self.genomes[mutant_genome_index].clone()
+            else:
+                genome = self.genomes[mutant_genome_index]
+            structure_changed_at_least_once = False
+            for mutation_event in mutation_events:
+                if living_parents_mask[mutant_genome_index]:
+                    dead, structure_changed = self.mutation_is_deleterious(
+                        mutation_event, genome
+                    )
+                    if structure_changed:
+                        if self.homogeneous:
+                            genome.blend()
+                        if not structure_changed_at_least_once:
+                            structure_changed_at_least_once = True
+                    if dead:
+                        living_parents_mask[mutant_genome_index] = False
+                        break
+
+            if structure_changed_at_least_once:
+                genome_changed.add(self.genomes[mutant_genome_index])
+            sons[son_index] = genome
+            son_index += 1
+            if son_index == self.population:
+                break
+
+        while son_index < self.population:
+            mutant_genome_index = self.rng.choice(len(self.genomes))
+            mutation_number = self.rng.binomial(
+                self.genomes[mutant_genome_index].length, self.total_mutation_rate
             )
-            over_draw = nbr_living_parents - self.population
-            self.over_draw_sum += over_draw
-            if over_draw < self.over_draw_min:
-                self.over_draw_min = over_draw
-            if over_draw > self.over_draw_max:
-                self.over_draw_max = over_draw
-        else:
-            nbr_missing_parents = self.population - nbr_living_parents
-            self.under_draw_sum += nbr_missing_parents
-            if nbr_missing_parents < self.under_draw_min:
-                self.under_draw_min = nbr_missing_parents
-            if nbr_missing_parents > self.under_draw_max:
-                self.under_draw_max = nbr_missing_parents
-            # print(nbr_missing_parents, "missing parents")
-            missing_parents = np.empty(nbr_missing_parents, dtype=Genome)
-
-            index = 0
-            self.while_loop_execution += 1
-            while index < nbr_missing_parents:
-                mutation = self.rng.choice(self.mutations)
-                parent_index = self.rng.choice(len(self.genomes))
-                if not self.mutation_is_deleterious(mutation, parent_index):
-                    missing_parents[index] = self.genomes[parent_index]
-                    index += 1
-                self.while_loop_sum += 1
-
-            self.genomes = self.vec_clone(
-                np.concatenate(
-                    (
-                        self.genomes[parents_indices[living_parents_mask]],
-                        missing_parents,
-                    ),
-                    dtype=Genome,
+            mutation_events = self.rng.choice(self.mutations, size=mutation_number)
+            if self.genomes[mutant_genome_index] in genome_changed:
+                genome = self.genomes[mutant_genome_index].clone()
+            else:
+                genome = self.genomes[mutant_genome_index]
+            structure_changed_at_least_once = False
+            for mutation_event in mutation_events:
+                dead, structure_changed = self.mutation_is_deleterious(
+                    mutation_event, genome
                 )
-            )
+                if structure_changed:
+                    if self.homogeneous:
+                        genome.blend()
+                    if not structure_changed_at_least_once:
+                        structure_changed_at_least_once = True
+                if dead:
+                    break
+            if structure_changed_at_least_once:
+                genome_changed.add(self.genomes[mutant_genome_index])
+            sons[son_index] = genome
+            son_index += 1
 
-        if self.blend:
-            self.genomes = self.vec_blend_genomes(self.genomes)
+        self.genomes = sons
+        del sons
 
         if generation % self.plot_point == 0 or generation == 1:
+
             z_nc_array = self.vec_get_genome_z_nc(self.genomes)
             z_nc_array.sort()
             z_nc_mean = z_nc_array.mean()
@@ -230,6 +254,7 @@ class WrightFisher(Simulation):
             genomes_stats = np.array(
                 [genome.stats.d_stats for genome in self.genomes], dtype=dict
             )
+
             population_stats = {
                 "z_nc_array": z_nc_array,
             }
@@ -247,7 +272,7 @@ class WrightFisher(Simulation):
                     args=(generation,),
                 )
                 plot_process.start()
-        return z_nc_mean, plot_process
+        return z_nc_mean, plot_process, parent_to_child_mapping
 
     def plot_simulation(
         self,
@@ -274,7 +299,13 @@ class WrightFisher(Simulation):
             with open(
                 self.save_path / "logs" / f"generation_{generation}.pkl", "rb"
             ) as pkl_file:
-                stats = pkl.load(pkl_file)
+                try:
+                    stats = pkl.load(pkl_file)
+                except EOFError:
+                    print(
+                        f"EOFError while loading generation {generation}, last generation could be corrupted."
+                    )
+                    break
 
             genome_raw_stats = stats["genome"]
             population_raw_stats = stats["population"]
@@ -284,11 +315,14 @@ class WrightFisher(Simulation):
                 dtype=np.float32,
             )
             genomes_non_coding_proportion_mean = np.mean(genomes_non_coding_proportion)
-            genomes_non_coding_proportion_var = (
-                np.var(genomes_non_coding_proportion)
-                * len(genomes_non_coding_proportion)
-                / (len(genomes_non_coding_proportion) - 1)
-            )
+            if self.population > 1:
+                genomes_non_coding_proportion_var = (
+                    np.var(genomes_non_coding_proportion)
+                    * len(genomes_non_coding_proportion)
+                    / (len(genomes_non_coding_proportion) - 1)
+                )
+            else:
+                genomes_non_coding_proportion_var = 0
             genomes_non_coding_proportion_means[index] = (
                 genomes_non_coding_proportion_mean
             )
@@ -301,11 +335,14 @@ class WrightFisher(Simulation):
                 dtype=np.ndarray,
             )
             genomes_nc_lengths_mean = np.mean(genomes_nc_lengths, axis=0)
-            genomes_nc_lengths_var = (
-                np.var(genomes_nc_lengths, axis=0)
-                * len(genomes_nc_lengths)
-                / (len(genomes_nc_lengths) - 1)
-            )
+            try:
+                genomes_nc_lengths_var = (
+                    np.var(genomes_nc_lengths, axis=0)
+                    * len(genomes_nc_lengths)
+                    / (len(genomes_nc_lengths) - 1)
+                )
+            except ZeroDivisionError:
+                genomes_nc_lengths_var = np.zeros(g, dtype=np.float32)
             genomes_nc_lengths_means[index] = genomes_nc_lengths_mean
             genomes_nc_lengths_vars[index] = genomes_nc_lengths_var
 
@@ -320,27 +357,28 @@ class WrightFisher(Simulation):
             "Non coding proportion",
         )
 
-        for stat_list_mean, stat_list_var, name in zip(
-            (genomes_nc_lengths_means, population_z_ncs),
-            (genomes_nc_lengths_vars, None),
-            (
-                "Genomes non coding lengths",
-                "Population z_nc",
-            ),
-        ):
-            for quantile in (0, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 1):
-                index = int((g - 1) * quantile)
-                mean_list = stat_list_mean[:, index]
-                var_list = (
-                    stat_list_var[:, index] if stat_list_var is not None else None
-                )
-                graphics.plot_simulation(
-                    x_values,
-                    mean_list,
-                    var_list,
-                    save_dir,
-                    f"{name} - {quantile * 100}th percentile",
-                )
+        for quantile in (0, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 1):
+            index = int((g - 1) * quantile)
+            mean_list = genomes_nc_lengths_means[:, index]
+            var_list = genomes_nc_lengths_vars[:, index]
+            graphics.plot_simulation(
+                x_values,
+                mean_list,
+                var_list,
+                save_dir,
+                f"Genomes non coding lengths - {quantile * 100}th percentile",
+            )
+        for quantile in (0, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 1):
+            index = int((self.population - 1) * quantile)
+            mean_list = population_z_ncs[:, index]
+            graphics.plot_simulation(
+                x_values,
+                mean_list,
+                None,
+                save_dir,
+                f"Population z_nc - {quantile * 100}th percentile",
+            )
+
         # if not only_plot:
         #     save_mutation_info = self.save_path / "mutation_info"
         #     save_mutation_info.mkdir(parents=True, exist_ok=True)

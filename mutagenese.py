@@ -3,7 +3,7 @@ from configparser import ConfigParser
 
 from tqdm import tqdm
 import json
-
+from typing import Any
 import graphics
 import mutations
 from experiment import Experiment
@@ -12,8 +12,8 @@ from utils import MUTATIONS, str_to_int, L_M
 
 
 class Mutagenese(Experiment):
-    def __init__(self, config: ConfigParser):
-        super().__init__(config)
+    def __init__(self, config: dict[str, Any], overwrite: bool = False):
+        super().__init__(config, overwrite)
         self.variable = self.mutagenese_config["Variable"]
         self.l_m = int(self.mutations_config["l_m"])
         self.homogeneous = self.genome_config["Homogeneous"]

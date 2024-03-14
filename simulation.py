@@ -42,6 +42,7 @@ class Simulation(Experiment):
         config: dict[str, Any],
         load_file: Path = Path(""),
         plot_in_time: bool = False,
+        overwrite: bool = False,
     ) -> None:
         """Simulation initialization.
 
@@ -52,15 +53,16 @@ class Simulation(Experiment):
         Raises:
             FileNotFoundError: If the file to load the population is not found, an exception is raised and execution stops.
         """
-        super().__init__(config)
+        super().__init__(config, overwrite=overwrite)
 
         ## Simulation initialization
         print("Initializing simulation")
         init_start = perf_counter()
 
         self.plot_in_time = plot_in_time
+
         self.generations = str_to_int(self.simulation_config["Generations"])
-        self.plot_number = int(self.simulation_config["Plot points"])
+        self.plot_number = str_to_int(self.simulation_config["Plot points"])
         self.plot_point = self.generations // self.plot_number
 
         self.population = str_to_int(self.simulation_config["Population size"])
@@ -71,11 +73,8 @@ class Simulation(Experiment):
         self.g = 0
         self.homogeneous = False
         self.orientation = False
-        if self.checkpoints_path == Path(""):
+        if not self.checkpointing:
             self.init_genomes(load_file)
-
-        self.saving_checkpoint = self.simulation_config["Save checkpoints"]
-        self.checkpoint = str_to_int(self.simulation_config["Checkpoints"])
 
         # Vectorize the clone method to apply it efficiently to the whole population.
         # https://numpy.org/doc/stable/reference/generated/numpy.vectorize.html
@@ -117,8 +116,6 @@ class Simulation(Experiment):
         )
 
     def init_genomes(self, load_file: Path):
-        self.blend = self.simulation_config["Blend"]
-
         # Load or create the population
         if load_file != Path(""):
             try:
@@ -224,13 +221,12 @@ class Simulation(Experiment):
     def mutation_is_deleterious(
         self,
         mutation_event: Mutation,
-        genome_index: int,
-    ) -> bool:
-        mutation_event.genome = self.genomes[genome_index]
+        genome: Genome,
+    ) -> tuple[bool, bool]:
+        mutation_event.genome = genome
         if mutation_event.is_neutral():
-            mutation_event.apply()
-            return False
-        return True
+            return (False, mutation_event.apply())
+        return True, False
 
     def format_time(self, time: float) -> str:
         if time < 60:
