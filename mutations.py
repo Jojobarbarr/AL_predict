@@ -55,7 +55,7 @@ class Mutation:
     def apply(
         self,
         virtually: bool = False,
-    ) -> None:
+    ) -> bool:
         """Counts the number of neutral mutations and their length.
 
         Args:
@@ -64,6 +64,7 @@ class Mutation:
         self.stats.neutral_count += 1
         self.stats.length_sum += self.length
         self.stats.length_square_sum += self.length**2
+        return False
 
     def theory(
         self,
@@ -246,7 +247,7 @@ class SmallInsertion(Mutation):
     def apply(
         self,
         virtually: bool = False,
-    ):
+    ) -> bool:
         """Applies the small insertion to the genome.
 
         Sets the insertion locus and the length of the insertion.
@@ -264,6 +265,7 @@ class SmallInsertion(Mutation):
         if not virtually:
             self.genome.insert(next_promoter_index, self.length)
         super().apply()
+        return True
 
     def theory(
         self,
@@ -321,7 +323,10 @@ class Deletion(Mutation):
         self.starting_locus += next_promoter_locus_index * self.genome.gene_length
         return self._ending_point_is_ok(self.starting_locus, next_promoter_locus_index)
 
-    def apply(self, virtually: bool = False):
+    def apply(
+        self,
+        virtually: bool = False,
+    ) -> bool:
         """Applies the deletion to the genome.
 
         Args:
@@ -341,6 +346,7 @@ class Deletion(Mutation):
             else:
                 self.genome.delete(self.starting_locus, self.length)
         super().apply()
+        return True
 
     def theory(
         self,
@@ -520,7 +526,7 @@ class Duplication(Mutation):
     def apply(
         self,
         virtually: bool = False,
-    ):
+    ) -> bool:
         """Applies the duplication to the genome.
 
         Sets the insertion locus.
@@ -537,6 +543,7 @@ class Duplication(Mutation):
         if not virtually:
             self.genome.insert(next_promoter_index, self.length)
         super().apply()
+        return True
 
     def theory(
         self,
@@ -587,14 +594,18 @@ class Inversion(Mutation):
         super().is_neutral()
         if not self._bernoulli((self.genome.z_nc + self.genome.g) / self.genome.length):
             return False
-        return self._bernoulli(
-            (self.genome.z_nc + self.genome.g - 1) / (self.genome.length - 1)
-        )
+        try:
+            return self._bernoulli(
+                (self.genome.z_nc + self.genome.g - 1) / (self.genome.length - 1)
+            )
+        except ZeroDivisionError:
+            # Genome lentgh is 1
+            return False
 
     def apply(
         self,
         virtually: bool = False,
-    ):
+    ) -> bool:
         """Applies the inversion to the genome.
 
         Sets the breaking locus. If starting locus is greater than ending locus, the inversion is reverted. Length is then genome.length - length.
@@ -602,6 +613,7 @@ class Inversion(Mutation):
         Args:
             virtually (bool, optional): If True, the genome isn't modified. Defaults to False.
         """
+        genome_structure_changed = True
         switched = False
         breaking_locus = rd.sample(range(0, self.genome.z_nc + self.genome.g), 2)
         if breaking_locus[1] < breaking_locus[0]:
@@ -618,6 +630,8 @@ class Inversion(Mutation):
             == next_promoter_locus_index_starting_locus
         ):
             self.length = breaking_locus[1] - breaking_locus[0]
+            genome_structure_changed = False
+
         else:
             self.starting_locus = (
                 breaking_locus[0]
@@ -634,6 +648,7 @@ class Inversion(Mutation):
         if switched:
             self.length = self.genome.length - self.length
         super().apply()
+        return genome_structure_changed
 
     def theory(
         self,
