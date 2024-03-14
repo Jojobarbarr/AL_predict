@@ -480,7 +480,7 @@ class ConfigGenerator(QWidget):
                 str_to_int(var)
                 return True
             except ValueError:
-                self.error_box(f"Please provide a valid {var} value. (Yours is {var})")
+                self.error_box(f"Please provide a valid value. (Yours is '{var}')")
                 return False
 
         ## GENOME ##

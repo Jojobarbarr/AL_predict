@@ -69,8 +69,8 @@ if __name__ == "__main__":
             experiment = WrightFisher(
                 config, args.load, args.plot_in_time, args.overwrite
             )
-        else:
-            experiment = Simulation(config, args.load)
+        elif config["Simulation"]["Replication model"] == "Moran":
+            pass
 
     if args.save:
         experiment.save_population("initial_population.pkl")
