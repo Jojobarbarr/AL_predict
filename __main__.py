@@ -67,7 +67,7 @@ if __name__ == "__main__":
     elif config["Experiment"]["Type"] == "Simulation":
         if config["Simulation"]["Replication model"] == "Wright-Fisher":
             experiment = WrightFisher(
-                config, args.load, args.plot_in_time, args.overwrite
+                config, args.load, args.plot_in_time, args.overwrite, args.only_plot
             )
         elif config["Simulation"]["Replication model"] == "Moran":
             pass

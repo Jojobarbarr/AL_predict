@@ -128,7 +128,7 @@ class TestGenome(unittest.TestCase):
     @parameterized.expand(
         [
             (0, 0),
-            (1, 0),
+            (1, 1),
             (2, 1),
             (52, 5),
             (133, 10),

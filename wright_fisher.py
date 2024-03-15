@@ -1,24 +1,16 @@
-from tqdm import tqdm
-import multiprocessing as mp
 import json
-import concurrent.futures
 import pickle as pkl
 from collections import Counter
-import random as rd
-from collections import defaultdict
-from configparser import ConfigParser
 from pathlib import Path
 from time import perf_counter
 from multiprocessing import Process
-import numpy as np
-import numpy.typing as npt
 import traceback
-import graphics
-from experiment import Experiment
 from typing import Any
+import numpy as np
+
+import graphics
 from genome import Genome
-from mutations import Mutation
-from utils import MUTATIONS, str_to_int, L_M
+from utils import str_to_int
 from simulation import Simulation
 
 
@@ -29,35 +21,31 @@ class WrightFisher(Simulation):
         load_file: Path = Path(""),
         plot_in_time: bool = False,
         overwrite: bool = False,
+        only_plot: bool = False,
     ):
         super().__init__(
-            config, load_file, plot_in_time=plot_in_time, overwrite=overwrite
+            config,
+            load_file,
+            plot_in_time=plot_in_time,
+            overwrite=overwrite,
+            only_plot=only_plot,
         )
         self.rng = np.random.default_rng()
-        self.safety_parent_proportion = 0.99
+        self.safety_parent_proportion = 0.9
 
-        self.over_draw_sum = 0
-        self.over_draw_min = np.inf
-        self.over_draw_max = 0
+        self.mutant_parent_indices_counter = Counter()
 
-        self.under_draw_sum = 0
-        self.under_draw_min = np.inf
-        self.under_draw_max = 0
+        # self.over_draw_sum = 0
+        # self.over_draw_min = np.inf
+        # self.over_draw_max = 0
 
-        self.wait_time = 0
-        self.while_loop_execution = 0
-        self.while_loop_sum = 0
+        # self.under_draw_sum = 0
+        # self.under_draw_min = np.inf
+        # self.under_draw_max = 0
 
-        self.total_mutation_rate_std = int(
-            self.total_mutation_rate * (1 - self.total_mutation_rate) * self.population
-        )
-        self.nbr_parents = (
-            int(
-                self.population
-                * (1 + self.total_mutation_rate + self.total_mutation_rate_std)
-            )
-            + 1
-        )
+        # self.wait_time = 0
+        # self.while_loop_execution = 0
+        # self.while_loop_sum = 0
 
     def run(
         self,
@@ -139,8 +127,10 @@ class WrightFisher(Simulation):
 
             print(f"Generation {generation} - End of simulation")
             print(f"Total time: {self.format_time(perf_counter() - main_start_time)}")
-            print(f"Mean wait time: {self.wait_time / self.plot_number}")
-        self.plot_simulation(generation, only_plot)
+            # print(f"Mean wait time: {self.wait_time / self.plot_number}")
+            self.plot_simulation(generation, only_plot)
+        else:
+            self.plot_simulation(self.generations, only_plot, ylim=20000)
 
     def generation_step(
         self,
@@ -180,10 +170,10 @@ class WrightFisher(Simulation):
         mutant_parent_indices: np.ndarray[Any, np.dtype[np.int64]] = self.rng.choice(
             parents_indices, size=mutation_number, p=genomes_biases
         )
-        mutant_parent_indices_counter: Counter[int] = Counter(mutant_parent_indices)
+        self.mutant_parent_indices_counter.update(mutant_parent_indices)
         mutation_per_genome: dict[int, np.ndarray[Any, Any]] = {
             mutant_parent_index: self.rng.choice(self.mutations, size=mutation_applied)
-            for mutant_parent_index, mutation_applied in mutant_parent_indices_counter.items()
+            for mutant_parent_index, mutation_applied in self.mutant_parent_indices_counter.items()
         }
 
         mutant_genome_index: int
@@ -263,21 +253,23 @@ class WrightFisher(Simulation):
             )
 
             if self.plot_in_time:
-                wait_start = perf_counter()
+                # wait_start = perf_counter()
                 plot_process.join()
-                wait_end = perf_counter()
-                self.wait_time += wait_end - wait_start
+                # wait_end = perf_counter()
+                # self.wait_time += wait_end - wait_start
                 plot_process = Process(
                     target=self.plot_simulation,
                     args=(generation,),
                 )
                 plot_process.start()
+        self.mutant_parent_indices_counter.clear()
         return z_nc_mean, plot_process, parent_to_child_mapping
 
     def plot_simulation(
         self,
         generation: int,
         only_plot: bool = False,
+        ylim: int = -1,
     ):
         g = str_to_int(self.genome_config["g"])
         x_values = np.array(
@@ -355,6 +347,7 @@ class WrightFisher(Simulation):
             genomes_non_coding_proportion_vars,
             save_dir,
             "Non coding proportion",
+            ylim=-1,
         )
 
         for quantile in (0, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 1):
@@ -367,6 +360,7 @@ class WrightFisher(Simulation):
                 var_list,
                 save_dir,
                 f"Genomes non coding lengths - {quantile * 100}th percentile",
+                ylim=ylim / g,
             )
         for quantile in (0, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 1):
             index = int((self.population - 1) * quantile)
@@ -377,6 +371,7 @@ class WrightFisher(Simulation):
                 None,
                 save_dir,
                 f"Population z_nc - {quantile * 100}th percentile",
+                ylim=ylim,
             )
 
         # if not only_plot:

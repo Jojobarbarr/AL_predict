@@ -18,7 +18,9 @@ class Experiment:
         checkpoints_path: Path to the checkpoints directory.
     """
 
-    def __init__(self, config: dict[str, Any], overwrite: bool = False):
+    def __init__(
+        self, config: dict[str, Any], overwrite: bool = False, only_plot: bool = False
+    ):
         self.mutations_config = config["Mutations"]
         self.genome_config = config["Genome"]
         self.mutation_rates_config = config["Mutation rates"]
@@ -29,11 +31,12 @@ class Experiment:
         self.checkpoint_number = config["Paths"]["Checkpoint number"]
         self.checkpoints_path = Path(config["Paths"]["Checkpoint"])
         self.save_path = Path(config["Paths"]["Save"])
-        self.create_save_directory(overwrite)
+        self.create_save_directory(overwrite, only_plot)
 
     def create_save_directory(
         self,
         overwrite: bool = False,
+        only_plot: bool = False,
     ):
         """Create the save directory."""
         folders = self.save_path.glob("./[0-9]/")
@@ -46,17 +49,20 @@ class Experiment:
                 self.save_path = folder
                 self.save_path.mkdir()
                 print(
-                    f"Save folder is: {self.save_path.name} (Overwriting a previous folder)"
+                    f"Save folder is: {self.save_path} (Overwriting a previous folder)"
                 )
+            elif only_plot:
+                self.save_path = folder.parent / str(replica_number)
+                print(f"Save folder is: {self.save_path} (Existent folder)")
             else:
                 self.save_path = folder.parent / str(replica_number + 1)
                 self.save_path.mkdir()
-                print(f"Save folder is: {self.save_path.name} (Creating a new folder)")
+                print(f"Save folder is: {self.save_path} (Creating a new folder)")
         else:
             save_name = "1"
             self.save_path = self.save_path / save_name
             self.save_path.mkdir(parents=True)
-            print(f"Save folder is: {self.save_path.name} (Creating a new folder)")
+            print(f"Save folder is: {self.save_path} (Creating a new folder)")
 
 
 def extract_number(folder):

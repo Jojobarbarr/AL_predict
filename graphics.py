@@ -77,6 +77,7 @@ def plot_simulation(
     std_values: npt.NDArray[np.float_] | None,
     save_path: Path,
     name: str,
+    ylim: float,
 ):
     save_path.mkdir(parents=True, exist_ok=True)
     plt.clf()
@@ -85,6 +86,8 @@ def plot_simulation(
     plt.title(f"{name} over generations")
     plt.xlabel("Generation")
     plt.ylabel(f"{name}")
+    if ylim > 0:
+        plt.ylim(0, ylim)
     plt.legend()
     plt.savefig(save_path / f"{name.lower().replace(' ', '_')}.jpg")
 

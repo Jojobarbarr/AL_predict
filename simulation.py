@@ -43,6 +43,7 @@ class Simulation(Experiment):
         load_file: Path = Path(""),
         plot_in_time: bool = False,
         overwrite: bool = False,
+        only_plot: bool = False,
     ) -> None:
         """Simulation initialization.
 
@@ -53,7 +54,7 @@ class Simulation(Experiment):
         Raises:
             FileNotFoundError: If the file to load the population is not found, an exception is raised and execution stops.
         """
-        super().__init__(config, overwrite=overwrite)
+        super().__init__(config, overwrite=overwrite, only_plot=only_plot)
 
         ## Simulation initialization
         print("Initializing simulation")
