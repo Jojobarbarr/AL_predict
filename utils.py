@@ -1,4 +1,8 @@
+import numpy as np
 import mutations
+
+
+QUANTILES = np.array([0.0, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 1.0], dtype=float)
 
 EPSILON = 1e-9
 

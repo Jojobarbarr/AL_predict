@@ -184,7 +184,7 @@ class Simulation(Experiment):
         """
         return genome.z_nc
 
-    def compute_genomes_stats(self, genome: Genome) -> Genome:
+    def compute_genomes_stats(self, genome: Genome) -> dict[str, Any]:
         """Compute the genome stats. This function is used through self.vec_compute_genomes_stats, its vectorized equivalent.
 
         Args:
@@ -194,7 +194,7 @@ class Simulation(Experiment):
             Genome: The genome with computed stats.
         """
         genome.compute_stats()
-        return genome
+        return genome.stats.d_stats
 
     def get_genome_length(self, genome: Genome) -> int:
         """Get genome length. This function is used through self.vec_get_genome_length, its vectorized equivalent.
