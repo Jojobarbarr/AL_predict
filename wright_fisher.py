@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 import pickle as pkl
 from collections import Counter
 from pathlib import Path
@@ -9,10 +10,10 @@ from typing import Any
 import numpy as np
 
 import graphics
+from genome import Genome
+from mutations import Mutation
 from utils import str_to_int, QUANTILES
 from simulation import Simulation
-
-PARALLELIZE = False
 
 
 class WrightFisher(Simulation):
@@ -31,14 +32,55 @@ class WrightFisher(Simulation):
             overwrite=overwrite,
             only_plot=only_plot,
         )
-        self.rng = np.random.default_rng()
+
         self.mutant_parent_indices_counter = Counter()
+
+        self.uniform_mutation: bool = self.check_uniform_mutation()
+        self.mutation_predraw_size: int = int(1e7)  # memory overhead very low.
+
+        self.mutations_applied: list[Mutation] = self.draw_mutations()
+
+        self.plot_process = Process(target=lambda: None)
         # self.chunk_number = cpu_count()
+
+    def check_uniform_mutation(self) -> bool:
+        """Check if the mutation distribution is uniform.
+
+        Returns:
+            bool: True if the mutation distribution is uniform, False otherwise.
+        """
+        first_rate = self.mutation_rates[0]
+        for rate in self.mutation_rates:
+            if rate != first_rate:
+                return False
+        return True
+
+    def draw_mutations(self) -> list[Mutation]:
+        """Draw a large number of mutation to avoid drawing them at each generation.
+
+        Returns:
+            list[Mutation]: list of reference to Mutation objects.
+        """
+        if self.uniform_mutation:
+            # numpy.random.Generator.choice without setting p is much faster than setting p.
+            return list(
+                self.rng.choice(self.mutations, size=self.mutation_predraw_size)
+            )
+        return list(
+            self.rng.choice(
+                self.mutations, size=self.mutation_predraw_size, p=self.biases_mutation
+            )
+        )
 
     def run(
         self,
         only_plot: bool = False,
     ):
+        """Main function of the Wright_Fisher simulation, iterates through generations.
+
+        Args:
+            only_plot (bool, optional): if True, skip all the processing part, and only calls plot_simulation function. Defaults to False.
+        """
         if not only_plot:
             if self.checkpointing:
                 print("Loading from checkpoint...")
@@ -49,52 +91,29 @@ class WrightFisher(Simulation):
             else:
                 for genome in self.genomes:
                     genome.compute_stats()
-                livings = np.ones(self.population, dtype=bool)
+                livings: np.ndarray[Any, np.dtype[np.bool_]] = np.ones(
+                    self.population, dtype=bool
+                )
 
-            main_start_time = perf_counter()
+            if self.plot_in_time:
+                self.plot_process.start()
 
             time_perfs = []
             sum_time_perfs = 0
-            plot_process = Process(
-                target=lambda: None,
-            )
-            if self.plot_in_time:
-                plot_process.start()
-            try:
+            main_start_time = perf_counter()
+
+            try:  # Ensure that results will be saved even if an error occurs, including KeyBoardInterrupt.
                 for generation in range(1, self.generations + 1):
                     start_time = perf_counter()
-                    livings, plot_process = self.generation_step(
-                        generation, livings, plot_process
-                    )
-
+                    livings = self.generation_step(generation, livings)
                     end_time = perf_counter()
                     time_perfs.append(end_time - start_time)
                     if generation % self.plot_point == 0:
-                        sum_over_last_generations = sum(time_perfs)
-                        generation_elapsed = len(time_perfs)
-                        try:
-                            average_time_perf_over_last_gens = (
-                                sum_over_last_generations / generation_elapsed
-                            )
-                        except ZeroDivisionError:
-                            average_time_perf_over_last_gens = sum_over_last_generations
-
-                        sum_time_perfs += sum_over_last_generations
-                        try:
-                            average_time_perf = sum_time_perfs / generation
-                        except ZeroDivisionError:
-                            average_time_perf = sum_time_perfs
-
-                        print(
-                            f"\nGeneration {generation}"
-                            f" - Mean elapsed time by generation: {average_time_perf:.4f} s/generation"
-                            f" - Last {generation_elapsed} generations: {average_time_perf_over_last_gens:.4f} s/generation"
-                        )
-                        print(
-                            f"{self.format_time(end_time - main_start_time)} elapsed since the beginning of the simulation "
-                            f"- \033[1mEstimated remaining time: {self.format_time(average_time_perf * (self.generations - generation))}\033[0m"
+                        sum_time_perfs = self.print_time_perfs(
+                            time_perfs, sum_time_perfs, generation
                         )
                         time_perfs = []
+
             except KeyboardInterrupt:
                 print("*" * 50)
                 print(
@@ -117,43 +136,183 @@ class WrightFisher(Simulation):
                 print("*" * 50)
                 generation -= 1
 
-            if plot_process.is_alive():
-                plot_process.join()
+            if self.plot_process.is_alive():
+                self.plot_process.join()
             self.save_checkpoint(generation, livings)
+            self.save_population("final")
 
             print(f"Generation {generation} - End of simulation")
             print(f"Total time: {self.format_time(perf_counter() - main_start_time)}")
-            self.save_population("final")
             self.plot_simulation(generation)
         else:
             self.plot_simulation(self.generations, ylim=20000)
+
+    def print_time_perfs(
+        self,
+        time_perfs: list[float],
+        sum_time_perfs: float,
+        generation: int,
+    ) -> float:
+        """Computes and prints the time performances of the simulation.
+
+        Args:
+            time_perfs (list[float]): List of the time performances of the last generations.
+            sum_time_perfs (float): Sum of the time performances of all generations.
+            generation (int): Current generation.
+
+        Returns:
+            float: the updated sum_time_perfs.
+        """
+        sum_over_last_generations = sum(time_perfs)
+        generation_elapsed = len(time_perfs)
+        try:
+            average_time_perf_over_last_gens = (
+                sum_over_last_generations / generation_elapsed
+            )
+        except ZeroDivisionError:
+            average_time_perf_over_last_gens = sum_over_last_generations
+
+        sum_time_perfs += sum_over_last_generations
+        try:
+            average_time_perf = sum_time_perfs / generation
+        except ZeroDivisionError:
+            average_time_perf = sum_time_perfs
+
+        print(
+            f"\nGeneration {generation}"
+            f" - Mean elapsed time by generation: {average_time_perf:.4f} s/generation"
+            f" - Last {generation_elapsed} generations: {average_time_perf_over_last_gens:.4f} s/generation"
+        )
+        print(
+            f"{self.format_time(sum_time_perfs)} elapsed since the beginning of the simulation "
+            f"- \033[1mEstimated remaining time: {self.format_time(average_time_perf * (self.generations - generation))}\033[0m"
+        )
+        return sum_time_perfs
 
     def generation_step(
         self,
         generation: int,
         livings: np.ndarray[Any, np.dtype[np.bool_]],
-        plot_process: Process,
-    ):
-        parents = self.rng.choice(self.genomes[livings], size=self.population)
+    ) -> np.ndarray[Any, np.dtype[np.bool_]]:
+        """Computes one generation of the Wright-Fisher simulation.
 
-        lengths = self.vec_get_genome_length(parents)
+        Args:
+            generation (int): Generation number.
+            livings (np.ndarray[Any, np.dtype[np.bool_]]): Mask of the living individuals.
+
+        Raises:
+            RuntimeError: All individuals died.
+
+        Returns:
+            np.ndarray[Any, np.dtype[np.bool_]]: living genome mask.
+        """
+        if not livings.all():
+            self.prepare_parents(livings)
+        mutation_per_genome = self.compute_mutation_number()
+
+        livings = np.ones(len(self.genomes), dtype=bool)
+
+        changed_counter = self.iterate_genomes(
+            self.genomes, mutation_per_genome, livings
+        )
+
+        if not livings.any():
+            raise RuntimeError(f"All individuals died on generation {generation}")
+
+        if generation % self.plot_point == 0 or generation == 1:
+            self.logging_and_plotting(livings, changed_counter, generation)
+
+        return livings
+
+    def prepare_parents(
+        self,
+        livings: np.ndarray[Any, np.dtype[np.bool_]],
+    ) -> None:
+        """Generate new population with living genomes and deepcopy parents that are duplicates.
+
+        Args:
+            livings (np.ndarray[Any, np.dtype[np.bool_]]): Living genomes mask
+        """
+        living_genomes: np.ndarray[Any, Any] = self.genomes[livings]
+        double_number: int = self.population - livings.sum()
+        clones: np.ndarray[Any, Any] = self.rng.choice(
+            living_genomes, size=double_number
+        )  # TODO: try to predraw the indices without introducing a bias.
+        clone_parents: np.ndarray[Any, Any] = np.array(
+            [genome.clone() for genome in clones]
+        )
+        self.genomes = np.concatenate((clone_parents, living_genomes))
+
+    def compute_mutation_number(
+        self,
+    ) -> dict[int, np.ndarray]:
+        """Computes the number of mutations to apply to each genome.
+
+        Returns:
+            dict[int, np.ndarray]: A dictionnary associating genomes and their mutations to apply if any.
+        """
+        # lengths = self.vec_get_genome_length(self.genomes)
+        lengths = np.array([genome.length for genome in self.genomes])
         total_bases_number = lengths.sum()
         genomes_biases = lengths / total_bases_number
         mutation_number = self.rng.binomial(
             total_bases_number, self.total_mutation_rate
         )
-
         mutant_parent_indices = self.rng.choice(
-            len(parents), size=mutation_number, p=genomes_biases
+            self.population, size=mutation_number, p=genomes_biases
         )
+
+        # unique_mutant_parent_indices, counts = np.unique(
+        #     mutant_parent_indices, return_counts=True
+        # )
+
+        # mutations = list(
+        #     self.rng.choice(
+        #         self.mutations, size=mutation_number, p=self.biases_mutation
+        #     )
+        # )
+        # mutation_per_genome = {
+        #     mutant_parent_index: np.array([mutations.pop() for _ in range(count)])
+        #     for mutant_parent_index, count in zip(unique_mutant_parent_indices, counts)
+        # }
+
+        if len(self.mutations_applied) < mutation_number:
+            self.mutations_applied = self.draw_mutations()
+
+        # mutation_per_genome = {
+        #     mutant_parent_index: np.array(
+        #         [self.mutations_applied.pop() for _ in range(count)]
+        #     )
+        #     for mutant_parent_index, count in zip(unique_mutant_parent_indices, counts)
+        # }
+
+        # This seems faster (only a few seconds on the test used), TODO: check with other tests.
+        self.mutant_parent_indices_counter.clear()
         self.mutant_parent_indices_counter.update(mutant_parent_indices)
         mutation_per_genome: dict[int, np.ndarray] = {
-            mutant_parent_index: self.rng.choice(self.mutations, size=mutation_applied)
+            mutant_parent_index: np.array(
+                [self.mutations_applied.pop() for _ in range(mutation_applied)]
+            )
             for mutant_parent_index, mutation_applied in self.mutant_parent_indices_counter.items()
         }
+        return mutation_per_genome
 
-        self.genomes = self.vec_clone(parents)
-        livings = np.ones(len(parents), dtype=bool)
+    def iterate_genomes(
+        self,
+        parents: np.ndarray[Any, Any],
+        mutation_per_genome: dict[int, np.ndarray],
+        livings: np.ndarray[Any, np.dtype[np.bool_]],
+    ) -> int:
+        """Iterates through genomes.
+
+        Args:
+            parents (np.ndarray[Any, Any]): Parents genomes to be mutate and replicate.
+            mutation_per_genome (dict[int, np.ndarray]): Dictionnary associating genomes and their mutations to apply if any.
+            livings (np.ndarray[Any, np.dtype[np.bool_]]): Mask of living genomes.
+
+        Returns:
+            float: The count of genomes that changed.
+        """
         changed_counter = 0
         for genome_index in range(len(parents)):
             structure_changed_at_least_once = False
@@ -171,42 +330,45 @@ class WrightFisher(Simulation):
                             self.genomes[genome_index].blend()
             if livings[genome_index] and structure_changed_at_least_once:
                 changed_counter += 1
+        return changed_counter
 
-        if not livings.any():
-            raise RuntimeError(f"All individuals died on generation {generation}")
+    def logging_and_plotting(
+        self,
+        livings: np.ndarray[Any, np.dtype[np.bool_]],
+        changed_counter: int,
+        generation: int,
+    ) -> None:
+        # z_nc_array = self.vec_get_genome_z_nc(self.genomes[livings])
+        z_nc_array = np.array([genome.z_nc for genome in self.genomes[livings]])
+        z_nc_array.sort()
+        quantile_idx = np.array(
+            [int(quantile * (len(z_nc_array) - 1)) for quantile in QUANTILES],
+            dtype=int,
+        )
+        z_nc_array = z_nc_array[quantile_idx]
+        # genomes_stats = self.vec_compute_genomes_stats(self.genomes[livings])
+        genomes_stats = np.array(
+            [self.compute_genomes_stats(genome) for genome in self.genomes[livings]]
+        )
 
-        ## LOGGING AND PLOTTING
-        if generation % self.plot_point == 0 or generation == 1:
-            z_nc_array = self.vec_get_genome_z_nc(self.genomes[livings])
-            z_nc_array.sort()
-            quantile_idx = np.array(
-                [int(quantile * (len(z_nc_array) - 1)) for quantile in QUANTILES],
-                dtype=int,
+        living_proportion = livings.sum() / self.population
+        change_proportion = changed_counter / self.population
+        population_stats = {
+            "Living child proportion": living_proportion,
+            "Changed proportion": change_proportion,
+            "z_nc_array": z_nc_array,
+        }
+        graphics.save_checkpoint(
+            self.save_path / "logs", genomes_stats, population_stats, generation
+        )
+
+        if self.plot_in_time:
+            self.plot_process.join()
+            self.plot_process = Process(
+                target=self.plot_simulation,
+                args=(generation, True),
             )
-            z_nc_array = z_nc_array[quantile_idx]
-            genomes_stats = self.vec_compute_genomes_stats(self.genomes[livings])
-
-            living_proportion = livings.sum() / self.population
-            change_proportion = changed_counter / self.population
-            population_stats = {
-                "Living child proportion": living_proportion,
-                "Changed proportion": change_proportion,
-                "z_nc_array": z_nc_array,
-            }
-            graphics.save_checkpoint(
-                self.save_path / "logs", genomes_stats, population_stats, generation
-            )
-
-            if self.plot_in_time:
-                plot_process.join()
-                plot_process = Process(
-                    target=self.plot_simulation,
-                    args=(generation, True),
-                )
-                plot_process.start()
-        self.mutant_parent_indices_counter.clear()
-
-        return livings, plot_process
+            self.plot_process.start()
 
     def plot_simulation(
         self,
@@ -217,7 +379,7 @@ class WrightFisher(Simulation):
         g = str_to_int(self.genome_config["g"])
         x_values = np.array(
             [generation for generation in range(0, generation + 1, self.plot_point)],
-            dtype=np.int64,
+            dtype=int,
         )
 
         genomes_non_coding_proportion_means = np.empty(len(x_values), dtype=np.float32)

@@ -60,6 +60,8 @@ class Simulation(Experiment):
         print("Initializing simulation")
         init_start = perf_counter()
 
+        self.rng: np.random.Generator = np.random.default_rng()
+
         self.plot_in_time = plot_in_time
 
         self.generations = str_to_int(self.simulation_config["Generations"])
@@ -74,8 +76,6 @@ class Simulation(Experiment):
         self.g = 0
         self.homogeneous = False
         self.orientation = False
-        if not self.checkpointing:
-            self.init_genomes(load_file)
 
         # Vectorize the clone method to apply it efficiently to the whole population.
         # https://numpy.org/doc/stable/reference/generated/numpy.vectorize.html
@@ -84,6 +84,9 @@ class Simulation(Experiment):
         self.vec_compute_genomes_stats = np.vectorize(self.compute_genomes_stats)
         self.vec_blend_genomes = np.vectorize(self.blend_genomes)
         self.vec_clone = np.vectorize(self.clone)
+
+        if not self.checkpointing:
+            self.init_genomes(load_file)
 
         init_end = perf_counter()
         print(f"Simulation initialized in {init_end - init_start} s")
@@ -119,15 +122,18 @@ class Simulation(Experiment):
     def init_genomes(self, load_file: Path):
         # Load or create the population
         if load_file != Path(""):
-            try:
-                print(f"Loading population {load_file}")
-                with open(load_file, "rb") as pkl_file:
-                    self.genomes = pkl.load(pkl_file)
-                print(f"Population {load_file} loaded")
-            except FileNotFoundError as exc:
-                raise FileNotFoundError(
-                    f"File {load_file} not found. Please provide a valid file."
-                ) from exc
+            print(f"Loading population {load_file}")
+            with open(load_file, "rb") as pkl_file:
+                self.genomes = pkl.load(pkl_file)
+            print(f"Population {load_file} loaded")
+
+            z_ncs = self.vec_get_genome_z_nc(self.genomes)
+            median_index = np.argsort(z_ncs)[len(z_ncs) // 2]
+            self.genomes = np.array(
+                [self.genomes[median_index].clone() for _ in range(self.population)],
+                dtype=Genome,
+            )
+
         else:
             print("Creating population")
             self.generate_genomes()
@@ -241,7 +247,7 @@ class Simulation(Experiment):
     def save_checkpoint(
         self,
         generation: int,
-        livings: npt.NDArray[np.bool_],
+        livings: np.ndarray[Any, np.dtype[np.bool_]],
     ):
         save_dir = self.save_path / "checkpoints"
         save_dir.mkdir(parents=True, exist_ok=True)
@@ -256,7 +262,7 @@ class Simulation(Experiment):
     def load_from_checkpoint(
         self,
         generation: int = -1,
-    ) -> np.dtype[np.bool_]:
+    ) -> np.ndarray[Any, np.dtype[np.bool_]]:
         if generation < 0:
             files = (self.save_path / "checkpoints").glob("*.pkl")
             generation = max([int(file.stem.split("_")[1]) for file in files])
