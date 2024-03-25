@@ -30,41 +30,65 @@ class Experiment:
         self.checkpointing = config["Paths"]["Checkpointing"]
         self.checkpoint_number = config["Paths"]["Checkpoint number"]
         self.checkpoints_path = Path(config["Paths"]["Checkpoint"])
-        self.save_path = Path(config["Paths"]["Save"])
+        self.save_path: Path = Path(config["Paths"]["Save"])
         self.create_save_directory(overwrite, only_plot)
 
-    def create_save_directory(
-        self,
-        overwrite: bool = False,
-        only_plot: bool = False,
-    ):
-        """Create the save directory."""
-        folders = self.save_path.glob("./[0-9]/")
-        folders = list(folders)
-        if len(folders) > 0:
-            last_replica = max([folder for folder in folders], key=extract_number)
-            replica_number, folder = extract_number(last_replica)
-            if overwrite:
-                shutil.rmtree(folder)
-                self.save_path = folder
-                self.save_path.mkdir()
-                print(
-                    f"Save folder is: {self.save_path} (Overwriting a previous folder)"
-                )
-            elif only_plot:
-                self.save_path = folder.parent / str(replica_number)
-                print(f"Save folder is: {self.save_path} (Existent folder)")
-            else:
-                self.save_path = folder.parent / str(replica_number + 1)
-                self.save_path.mkdir()
-                print(f"Save folder is: {self.save_path} (Creating a new folder)")
+    def create_save_directory(self, overwrite: bool = False, only_plot: bool = False):
+        folders = self.save_path.glob("*")
+        folders = [
+            int(folder.stem)
+            for folder in folders
+            if folder.is_dir() and folder.stem[0] != "_"
+        ] + [0]
+        last_folder = max(folders)
+        if overwrite and last_folder > 0:
+            self.save_path /= str(last_folder)
+            shutil.rmtree(self.save_path)
+            self.save_path.mkdir()
+            print(f"Save folder is: {self.save_path} (Overwriting a previous folder)")
+        elif only_plot and last_folder > 0:
+            self.save_path /= str(last_folder)
+            print(f"Save folder is: {self.save_path} (Existent folder)")
         else:
-            save_name = "1"
-            self.save_path = self.save_path / save_name
+            self.save_path /= str(last_folder + 1)
             self.save_path.mkdir(parents=True)
             print(f"Save folder is: {self.save_path} (Creating a new folder)")
 
 
-def extract_number(folder):
-    replica_number = re.findall(r"\d+$", folder.name)
-    return (int(replica_number[0]) if replica_number else -1, folder)
+#     def create_save_directory(
+#         self,
+#         overwrite: bool = False,
+#         only_plot: bool = False,
+#     ):
+#         """Create the save directory."""
+#         folders = self.save_path.glob("./[0-9]/")
+#         folders = list(folders)
+#         if len(folders) > 0:
+#             last_replica = max([folder for folder in folders], key=extract_number)
+#             replica_number, folder = extract_number(last_replica)
+#             if overwrite:
+#                 shutil.rmtree(folder)
+#                 self.save_path = folder
+#                 self.save_path.mkdir()
+#                 print(
+#                     f"Save folder is: {self.save_path} (Overwriting a previous folder)"
+#                 )
+#             elif only_plot:
+#                 self.save_path = folder.parent / str(replica_number)
+#                 print(f"Save folder is: {self.save_path} (Existent folder)")
+#             else:
+#                 self.save_path = folder.parent / str(replica_number + 1)
+#                 self.save_path.mkdir()
+#                 print(f"Save folder is: {self.save_path} (Creating a new folder)")
+#         else:
+#             save_name = "1"
+#             self.save_path = self.save_path / save_name
+#             self.save_path.mkdir(parents=True)
+#             print(f"Save folder is: {self.save_path} (Creating a new folder)")
+
+
+# def extract_number(folder):
+#     print(folder.name)
+#     replica_number = re.findall(r"\d+$", folder.name)
+#     print(replica_number)
+#     return (int(replica_number[0]) if replica_number else -1, folder)
