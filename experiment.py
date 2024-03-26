@@ -1,7 +1,7 @@
-from typing import Any
-from pathlib import Path
-import re
 import shutil
+from argparse import Namespace
+from pathlib import Path
+from typing import Any
 
 
 class Experiment:
@@ -19,76 +19,87 @@ class Experiment:
     """
 
     def __init__(
-        self, config: dict[str, Any], overwrite: bool = False, only_plot: bool = False
-    ):
+        self,
+        config: dict[str, Any],
+        args: Namespace,
+    ) -> None:
+        """Initialize the experiment with the configuration and the arguments.
+
+        Args:
+            config (dict[str, Any]): The configuration file of the experiment.
+            args (Namespace): The arguments of the replication.
+        """
+        self.verbose = args.verbose
         self.mutations_config = config["Mutations"]
         self.genome_config = config["Genome"]
         self.mutation_rates_config = config["Mutation rates"]
         self.mutagenese_config = config["Mutagenese"]
         self.simulation_config = config["Simulation"]
 
-        self.checkpointing = config["Paths"]["Checkpointing"]
-        self.checkpoint_number = config["Paths"]["Checkpoint number"]
-        self.checkpoints_path = Path(config["Paths"]["Checkpoint"])
+        self.checkpoints_path = args.checkpoint
         self.save_path: Path = Path(config["Paths"]["Save"])
-        self.create_save_directory(overwrite, only_plot)
+        self.create_save_directory(args.overwrite, args.only_plot)
+        self.write_readme(config, args)
 
-    def create_save_directory(self, overwrite: bool = False, only_plot: bool = False):
+    def create_save_directory(
+        self,
+        overwrite: bool,
+        only_plot: bool,
+    ) -> None:
+        """Create the save directory according to the previous experiment and the arguments.
+
+        Args:
+            overwrite (bool): If True, the save directory will overwrite the previous one.
+            only_plot (bool): If True, the save directory will be the previous one but no overwrite should occur.
+        """
         folders = self.save_path.glob("*")
         folders = [
             int(folder.stem)
             for folder in folders
             if folder.is_dir() and folder.stem[0] != "_"
         ] + [0]
-        last_folder = max(folders)
+        last_folder = max(folders)  # folders is never empty beacause of ' + [0]'
+
         if overwrite and last_folder > 0:
             self.save_path /= str(last_folder)
             shutil.rmtree(self.save_path)
             self.save_path.mkdir()
             print(f"Save folder is: {self.save_path} (Overwriting a previous folder)")
+
         elif only_plot and last_folder > 0:
             self.save_path /= str(last_folder)
             print(f"Save folder is: {self.save_path} (Existent folder)")
+
         else:
             self.save_path /= str(last_folder + 1)
             self.save_path.mkdir(parents=True)
             print(f"Save folder is: {self.save_path} (Creating a new folder)")
 
+    def write_readme(
+        self,
+        config: dict[str, Any],
+        args: Namespace,
+    ) -> None:
+        """Write the README.md file with the configuration and the arguments.
 
-#     def create_save_directory(
-#         self,
-#         overwrite: bool = False,
-#         only_plot: bool = False,
-#     ):
-#         """Create the save directory."""
-#         folders = self.save_path.glob("./[0-9]/")
-#         folders = list(folders)
-#         if len(folders) > 0:
-#             last_replica = max([folder for folder in folders], key=extract_number)
-#             replica_number, folder = extract_number(last_replica)
-#             if overwrite:
-#                 shutil.rmtree(folder)
-#                 self.save_path = folder
-#                 self.save_path.mkdir()
-#                 print(
-#                     f"Save folder is: {self.save_path} (Overwriting a previous folder)"
-#                 )
-#             elif only_plot:
-#                 self.save_path = folder.parent / str(replica_number)
-#                 print(f"Save folder is: {self.save_path} (Existent folder)")
-#             else:
-#                 self.save_path = folder.parent / str(replica_number + 1)
-#                 self.save_path.mkdir()
-#                 print(f"Save folder is: {self.save_path} (Creating a new folder)")
-#         else:
-#             save_name = "1"
-#             self.save_path = self.save_path / save_name
-#             self.save_path.mkdir(parents=True)
-#             print(f"Save folder is: {self.save_path} (Creating a new folder)")
-
-
-# def extract_number(folder):
-#     print(folder.name)
-#     replica_number = re.findall(r"\d+$", folder.name)
-#     print(replica_number)
-#     return (int(replica_number[0]) if replica_number else -1, folder)
+        Args:
+            config (dict[str, Any]): The configuration file of the experiment.
+            args (Namespace): The arguments of the replication.
+        """
+        with open(self.save_path / "README.md", "w", encoding="utf8") as readme:
+            readme.write("# Experiment\n")
+            readme.write("## Configuration\n")
+            for key, value in config.items():
+                readme.write(f"### {key}\n")
+                if isinstance(value, dict):
+                    for key2, value2 in value.items():
+                        readme.write(f"#### {key2}\n")
+                        readme.write(f"{value2}\n")
+                else:
+                    readme.write(f"{value}\n")
+                readme.write("\n")
+            readme.write("## Arguments\n")
+            for key, value in vars(args).items():
+                readme.write(f"### {key}\n")
+                readme.write(f"{value}\n")
+                readme.write("\n")

@@ -1,21 +1,17 @@
-from tqdm import tqdm
-import multiprocessing as mp
 import json
-import concurrent.futures
-from typing import Any
 import pickle as pkl
-import random as rd
-from collections import defaultdict
+from argparse import Namespace
 from pathlib import Path
 from time import perf_counter
+from typing import Any
+
 import numpy as np
-import numpy.typing as npt
 
 import graphics
 from experiment import Experiment
 from genome import Genome
 from mutations import Mutation
-from utils import MUTATIONS, str_to_int, L_M
+from utils import L_M, MUTATIONS, str_to_int
 
 
 class Simulation(Experiment):
@@ -40,10 +36,7 @@ class Simulation(Experiment):
     def __init__(
         self,
         config: dict[str, Any],
-        load_file: Path = Path(""),
-        plot_in_time: bool = False,
-        overwrite: bool = False,
-        only_plot: bool = False,
+        args: Namespace,
     ) -> None:
         """Simulation initialization.
 
@@ -54,15 +47,16 @@ class Simulation(Experiment):
         Raises:
             FileNotFoundError: If the file to load the population is not found, an exception is raised and execution stops.
         """
-        super().__init__(config, overwrite=overwrite, only_plot=only_plot)
+        super().__init__(config, args)
 
         ## Simulation initialization
         print("Initializing simulation")
         init_start = perf_counter()
 
         self.rng: np.random.Generator = np.random.default_rng()
+        # self.rng: np.random.Generator = np.random.default_rng(42)
 
-        self.plot_in_time = plot_in_time
+        self.plot_in_time = args.plot_in_time
 
         self.generations = str_to_int(self.simulation_config["Generations"])
         self.plot_number = str_to_int(self.simulation_config["Plot points"])
@@ -72,26 +66,34 @@ class Simulation(Experiment):
 
         self.init_mutations()
         self.genomes = np.empty(self.population, dtype=Genome)
-        self.z_c = 0
-        self.g = 0
-        self.homogeneous = False
-        self.orientation = False
 
-        # Vectorize the clone method to apply it efficiently to the whole population.
-        # https://numpy.org/doc/stable/reference/generated/numpy.vectorize.html
-        self.vec_get_genome_length = np.vectorize(self.get_genome_length)
-        self.vec_get_genome_z_nc = np.vectorize(self.get_genome_z_nc)
-        self.vec_compute_genomes_stats = np.vectorize(self.compute_genomes_stats)
-        self.vec_blend_genomes = np.vectorize(self.blend_genomes)
-        self.vec_clone = np.vectorize(self.clone)
+        self.homogeneous = self.genome_config["Homogeneous"]
+        self.orientation = self.genome_config["Orientation"]
+        self.g = str_to_int(self.genome_config["g"])
+        self.z_c = self.set_z("z_c")
 
-        if not self.checkpointing:
-            self.init_genomes(load_file)
+        # # https://numpy.org/doc/stable/reference/generated/numpy.vectorize.html
+        # self.vec_get_genome_length = np.vectorize(self.get_genome_length)
+        # self.vec_get_genome_z_nc = np.vectorize(self.get_genome_z_nc)
+        # self.vec_compute_genomes_stats = np.vectorize(self.compute_genomes_stats)
+        # self.vec_blend_genomes = np.vectorize(self.blend_genomes)
+        # self.vec_clone = np.vectorize(self.clone)
+        self.initial_generation: int = 0
+        self.livings: np.ndarray[Any, np.dtype[np.bool_]] = np.ones(
+            self.population, dtype=bool
+        )
+        if args.checkpoint == Path(""):
+            self.init_genomes(args.load)
+        else:
+            self.livings, self.initial_generation = self.load_from_checkpoint(
+                args.checkpoint
+            )
 
         init_end = perf_counter()
         print(f"Simulation initialized in {init_end - init_start} s")
 
     def init_mutations(self):
+        """Initialize the mutations."""
         mutation_types = self.mutations_config["Mutation types"]
 
         # Mutation rates
@@ -119,31 +121,27 @@ class Simulation(Experiment):
             dtype=Mutation,
         )
 
-    def init_genomes(self, load_file: Path):
+    def init_genomes(self, load_file: Path) -> None:
+        """Initialize the population generating it or loading an individual then cloning it.
+
+        Args:
+            load_file (Path): The file to load the individual from. If empty, population is generated.
+        """
         # Load or create the population
         if load_file != Path(""):
-            print(f"Loading population {load_file}")
             with open(load_file, "rb") as pkl_file:
-                self.genomes = pkl.load(pkl_file)
-            print(f"Population {load_file} loaded")
+                genome = pkl.load(pkl_file)
 
-            z_ncs = self.vec_get_genome_z_nc(self.genomes)
-            median_index = np.argsort(z_ncs)[len(z_ncs) // 2]
             self.genomes = np.array(
-                [self.genomes[median_index].clone() for _ in range(self.population)],
+                [genome.clone() for _ in range(self.population)],
                 dtype=Genome,
             )
 
         else:
-            print("Creating population")
             self.generate_genomes()
-            print("Population created")
 
-    def generate_genomes(self):
-        self.homogeneous = self.genome_config["Homogeneous"]
-        self.orientation = self.genome_config["Orientation"]
-        self.g = str_to_int(self.genome_config["g"])
-        self.z_c = self.set_z("z_c")
+    def generate_genomes(self) -> None:
+        """Generate the population of genomes according to the configuration file."""
         z_nc = self.set_z("z_nc")
 
         self.genomes = np.array(
@@ -254,6 +252,7 @@ class Simulation(Experiment):
         to_dump = {
             "self.genomes": self.genomes,
             "livings": livings,
+            "generation": generation,
         }
         with open(save_dir / f"generation_{generation}.pkl", "wb") as pkl_file:
             pkl.dump(to_dump, pkl_file, protocol=pkl.HIGHEST_PROTOCOL)
@@ -261,18 +260,22 @@ class Simulation(Experiment):
 
     def load_from_checkpoint(
         self,
-        generation: int = -1,
-    ) -> np.ndarray[Any, np.dtype[np.bool_]]:
-        if generation < 0:
-            files = (self.save_path / "checkpoints").glob("*.pkl")
-            generation = max([int(file.stem.split("_")[1]) for file in files])
-        with open(
-            self.save_path / "checkpoints" / f"generation_{generation}.pkl", "rb"
-        ) as pkl_file:
+        path_to_checkpoint: Path,
+    ) -> tuple[np.ndarray[Any, np.dtype[np.bool_]], int]:
+        """Load the simulation from a checkpoint.
+
+        Args:
+            path_to_checkpoint (Path): The path to the pickle file containing the checkpoints information.
+
+        Returns:
+            tuple[np.ndarray[Any, np.dtype[np.bool_]], int]: the current living mask and the generation.
+        """
+        with open(path_to_checkpoint, "rb") as pkl_file:
             loaded = pkl.load(pkl_file)
         self.genomes = loaded["self.genomes"]
         livings = loaded["livings"]
-        return livings
+        generation = loaded["generation"]
+        return livings, generation
 
     def plot_mutation_info(self):
         dict_mutation_info = {}

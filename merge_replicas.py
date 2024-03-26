@@ -31,9 +31,10 @@ if __name__ == "__main__":
         [generation for generation in range(0, generations + 1, plot_points)],
         dtype=np.int64,
     )
+
+    folders = ["1"]
     non_coding_proportion = np.zeros((len(folders), len(x_values)))
     livings = np.zeros((len(folders), len(x_values)))
-
     inclompete_mask = np.zeros(len(folders), dtype=bool)
     for replica_index, replica in enumerate(folders):
         replica_dir = result_dir / replica

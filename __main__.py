@@ -40,8 +40,8 @@ if __name__ == "__main__":
         "-l",
         "--load",
         type=Path,
-        default="",
-        help="If used, the initial population will be loaded from a specified file.",
+        default=".",
+        help="If used, the initial population will be loaded from a specified file (must contain only one individual).",
     )
     arg_parser.add_argument(
         "-t",
@@ -55,6 +55,20 @@ if __name__ == "__main__":
         action="store_true",
         help="If used, the save directory will be overwritten.",
     )
+    arg_parser.add_argument(
+        "-c",
+        "--checkpoint",
+        type=Path,
+        default=".",
+        help="If used, the simulation will be loaded from a checkpoint.",
+    )
+
+    arg_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="If used, the program will print more regularly the advancement of the simulation. Can slow down the simulation.",
+    )
 
     args = arg_parser.parse_args()
 
@@ -66,15 +80,8 @@ if __name__ == "__main__":
 
     elif config["Experiment"]["Type"] == "Simulation":
         if config["Simulation"]["Replication model"] == "Wright-Fisher":
-            experiment = WrightFisher(
-                config, args.load, args.plot_in_time, args.overwrite, args.only_plot
-            )
-        elif config["Simulation"]["Replication model"] == "Moran":
-            pass
+            experiment = WrightFisher(config, args)
+        if args.save:
+            experiment.save_population("initial_population.pkl")
 
-    if args.save:
-        experiment.save_population("initial_population.pkl")
-
-    experiment.run(
-        only_plot=args.only_plot,
-    )
+    experiment.run(only_plot=args.only_plot)

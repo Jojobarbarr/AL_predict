@@ -3,6 +3,8 @@ import numpy as np
 
 from stats import GenomeStatistics
 
+COUNTER = 0
+
 
 class Genome:
     def __init__(
@@ -13,6 +15,9 @@ class Genome:
         homogeneous: bool = False,
         orientation: bool = False,
     ):
+        global COUNTER
+        COUNTER += 1
+        self.counter = COUNTER
         if g == 1 and z_c == 1 and z_nc == 1:
             # Dummy genome, no calculation will be done on it.
             return None
@@ -52,9 +57,9 @@ class Genome:
         genome.g = self.g
         genome.homogeneous = self.homogeneous
         genome.orientation = self.orientation
-        genome.stats = self.stats.clone()
         genome.gene_length = self.gene_length
         genome.max_length_neutral = self.max_length_neutral
+        genome.stats = self.stats.clone()
         genome.loci = self.loci.copy()
         genome.orientation_list = self.orientation_list.copy()
         genome.loci_interval = self.loci_interval.copy()
