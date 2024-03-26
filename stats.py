@@ -70,7 +70,7 @@ class GenomeStatistics(Statistics):
         clone = GenomeStatistics()
         clone.nc_proportion = self.nc_proportion
         clone.intervals_between_loci = self.intervals_between_loci.copy()
-        clone.d_stats = self.d_stats
+        clone.d_stats = self.d_stats.copy()
         return clone
 
     def compute(self, genome) -> None:
