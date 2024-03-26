@@ -35,7 +35,11 @@ class Experiment:
 
     def create_save_directory(self, overwrite: bool = False, only_plot: bool = False):
         folders = self.save_path.glob("*")
-        folders = [int(folder.stem) for folder in folders if folder.is_dir()] + [0]
+        folders = [
+            int(folder.stem)
+            for folder in folders
+            if folder.is_dir() and folder.stem[0] != "_"
+        ] + [0]
         last_folder = max(folders)
         if overwrite and last_folder > 0:
             self.save_path /= str(last_folder)
