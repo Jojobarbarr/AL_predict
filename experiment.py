@@ -38,13 +38,14 @@ class Experiment:
 
         self.checkpoints_path = args.checkpoint
         self.save_path: Path = Path(config["Paths"]["Save"])
-        self.create_save_directory(args.overwrite, args.only_plot)
+        self.create_save_directory(args.overwrite, args.only_plot, args.checkpoint)
         self.write_readme(config, args)
 
     def create_save_directory(
         self,
         overwrite: bool,
         only_plot: bool,
+        checkpoint: Path,
     ) -> None:
         """Create the save directory according to the previous experiment and the arguments.
 
@@ -52,6 +53,11 @@ class Experiment:
             overwrite (bool): If True, the save directory will overwrite the previous one.
             only_plot (bool): If True, the save directory will be the previous one but no overwrite should occur.
         """
+        if checkpoint != Path(""):
+            self.save_path = checkpoint.parent.parent
+            print(f"Save folder is: {self.save_path} (Loading from a checkpoint)")
+            return
+
         folders = self.save_path.glob("*")
         folders = [
             int(folder.stem)

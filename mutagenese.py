@@ -1,6 +1,5 @@
 import math as m
-from configparser import ConfigParser
-
+from argparse import Namespace
 from tqdm import tqdm
 import json
 from typing import Any
@@ -12,8 +11,8 @@ from utils import MUTATIONS, str_to_int, L_M
 
 
 class Mutagenese(Experiment):
-    def __init__(self, config: dict[str, Any], overwrite: bool = False):
-        super().__init__(config, overwrite)
+    def __init__(self, config: dict[str, Any], args: Namespace):
+        super().__init__(config, args)
         self.variable = self.mutagenese_config["Variable"]
         self.l_m = int(self.mutations_config["l_m"])
         self.homogeneous = self.genome_config["Homogeneous"]

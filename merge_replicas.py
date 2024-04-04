@@ -6,6 +6,7 @@ import pickle as pkl
 from argparse import ArgumentParser
 from graphics import plot_simulation
 
+MEAN_MASK = 0.2
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -13,13 +14,21 @@ if __name__ == "__main__":
     parser.add_argument(
         "-i", "--skip_incomplete", action="store_true", help="Skip incomplete replicas"
     )
+    parser.add_argument(
+        "-p",
+        "--precise",
+        action="store_true",
+        help="Print the mean of the last (1-MEAN_MASK) generations",
+    )
     args = parser.parse_args()
 
     with open(args.config, "r", encoding="utf8") as json_file:
         config = json.load(json_file)
 
     generations = str_to_int(config["Simulation"]["Generations"])
-    plot_points = generations // str_to_int(config["Simulation"]["Plot points"])
+    plot_points = int(generations // str_to_int(config["Simulation"]["Plot points"]))
+    # generations = int(1e7)
+    # plot_points = generations // int(1e3)
     result_dir = Path(config["Paths"]["Save"])
     population = str_to_int(config["Simulation"]["Population size"])
     replicas = result_dir.glob("*")
@@ -31,8 +40,7 @@ if __name__ == "__main__":
         [generation for generation in range(0, generations + 1, plot_points)],
         dtype=np.int64,
     )
-
-    folders = ["1"]
+    # folders = ["1", "2", "3", "4"]
     non_coding_proportion = np.zeros((len(folders), len(x_values)))
     livings = np.zeros((len(folders), len(x_values)))
     inclompete_mask = np.zeros(len(folders), dtype=bool)
@@ -61,7 +69,8 @@ if __name__ == "__main__":
         except FileNotFoundError:
             if args.skip_incomplete:
                 inclompete_mask[replica_index] = True
-
+    print(livings[:, (livings.shape[1] // 2) :].mean())
+    print(non_coding_proportion[:, (non_coding_proportion.shape[1] // 2) :].mean())
     save_dir = result_dir / "_plots"
     plot_simulation(
         x_values,
@@ -79,3 +88,7 @@ if __name__ == "__main__":
         "Living children proportion",
         ylim=-1,
     )
+    if args.precise:
+        print(
+            f"Mean value once equilibrium is reached: {non_coding_proportion[:, int(MEAN_MASK * len(x_values)):].mean()}"
+        )

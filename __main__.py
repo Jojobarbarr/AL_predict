@@ -60,9 +60,8 @@ if __name__ == "__main__":
         "--checkpoint",
         type=Path,
         default=".",
-        help="If used, the simulation will be loaded from a checkpoint.",
+        help="If used, the simulation will be loaded from a checkpoint and saved in the first replica folder, unless a replica is specified with the -r option.",
     )
-
     arg_parser.add_argument(
         "-v",
         "--verbose",
@@ -76,7 +75,7 @@ if __name__ == "__main__":
         config = json.load(json_file)
 
     if config["Experiment"]["Type"] == "Mutagenese":
-        experiment = Mutagenese(config)
+        experiment = Mutagenese(config, args)
 
     elif config["Experiment"]["Type"] == "Simulation":
         if config["Simulation"]["Replication model"] == "Wright-Fisher":

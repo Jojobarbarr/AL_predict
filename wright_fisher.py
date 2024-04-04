@@ -132,7 +132,7 @@ class WrightFisher(Simulation):
             if self.plot_process.is_alive():
                 self.plot_process.join()
             self.save_checkpoint(generation, self.livings)
-            self.save_population("final")
+            self.save_population(str(generation))
 
             print(f"Generation {generation} - End of simulation")
             print(f"Total time: {self.format_time(perf_counter() - main_start_time)}")
