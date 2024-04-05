@@ -165,7 +165,7 @@ class Mutation:
         starting_locus: int,
         next_promoter_locus_index: int,
     ) -> bool:
-        """Ensures that the ending point of the mutation is ok (for mutation types that need it, like deletion, inversion, duplication)
+        """Ensures that the ending point of the mutation is ok (for mutation types that need it, like deletion, inversion)
 
         Args:
             starting_locus (int): the starting locus in genome.
@@ -174,10 +174,18 @@ class Mutation:
         Returns:
             bool: True if ending point is ok, False otherwise.
         """
-        # Handle the case when starting point is between last promoter and ORI.
-        if next_promoter_locus_index == len(self.genome.loci):
-            # In circular genome case, first promoter locus is genome.loci[0] (mod genome.length).
-            next_promoter_locus = self.genome.length + self.genome.loci[0]
+        if self._bernoulli(1 / 2):
+            # Going forward
+            orientation = 0
+            # Handle the case when starting point is between last promoter and ORI.
+            if next_promoter_locus_index == len(self.genome.loci):
+                next_promoter_locus = self.genome.length + self.genome.loci[0]
+        else:
+            # Going backward
+            orientation = -1
+            if next_promoter_locus_index == 0:
+                previous_promoter_index = 0 - (self.genome.length - self.genome.loci[-1])
+        
         else:
             next_promoter_locus = self.genome.loci[next_promoter_locus_index]
         if self.length <= next_promoter_locus - starting_locus:
@@ -296,7 +304,7 @@ class Deletion(Mutation):
         super().__init__(genome)
         self.starting_locus = 0
 
-    def is_neutral(
+    def is_neutral_v1(
         self,
     ) -> bool:
         """Checks if the deletion is neutral or not.
@@ -316,6 +324,22 @@ class Deletion(Mutation):
         if not self._length_is_ok():
             return False
 
+        self.starting_locus = self._pick_locus_in_neutral_space(self.genome.z_nc - 1)
+        next_promoter_locus_index = self._get_next_promoter_index(
+            self.starting_locus, self.genome.deletion_binary_search
+        )
+        self.starting_locus += next_promoter_locus_index * self.genome.gene_length
+        return self._ending_point_is_ok(self.starting_locus, next_promoter_locus_index)
+
+    def is_neutral(
+        self,
+    ) -> bool:
+        super().is_neutral()
+        if not self._bernoulli(self.genome.z_nc / self.genome.length):
+            return False
+        self.length = self._set_length()
+        if not self._length_is_ok():
+            return False
         self.starting_locus = self._pick_locus_in_neutral_space(self.genome.z_nc - 1)
         next_promoter_locus_index = self._get_next_promoter_index(
             self.starting_locus, self.genome.deletion_binary_search
@@ -508,6 +532,8 @@ class Duplication(Mutation):
         super().is_neutral()
         if not self._bernoulli((self.genome.z_nc + self.genome.g) / self.genome.length):
             return False
+        # if not self._bernoulli(1 / 2):
+        #     return False
         self.length = self._set_length()
         if not self._length_is_ok():
             return False

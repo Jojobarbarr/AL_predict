@@ -196,14 +196,14 @@ def iterate(g, z_c, z_nc, N, mu, l_m, iterations, time_acceleration):
     mu = Decimal(mu)
 
     L, alpha, segment_length, Ne = update(N, g, z_c, z_nc, mu, l_m)
-
+    print(f"Initial living proportion: {Ne / N}")
     progress_point = iterations // 20
     nc_proportions = []
     Nes = []
 
     start_time = perf_counter()
     try:
-        for iteration in range(iterations):
+        for iteration in range(iterations + 1):
             pre_computed_tablePfix_positive_k, pre_computed_tablePfix_negative_k = (
                 tablePfix(g, z_c, z_nc, Ne, mu, l_m, segment_length, alpha)
             )
@@ -232,7 +232,7 @@ def iterate(g, z_c, z_nc, N, mu, l_m, iterations, time_acceleration):
             if iteration != 0 and iteration % progress_point == 0:
                 checkpoint_time = perf_counter() - start_time
                 print(
-                    f"Iteration {iteration}/{iterations} - {checkpoint_time:.2f}s elapsed - Remaining about {(iterations - iteration) * (checkpoint_time / iteration):.2f}"
+                    f"Iteration {iteration}/{iterations} - {checkpoint_time:.2f}s elapsed - Remaining about {(iterations - iteration) * (checkpoint_time / iteration):.2f}s"
                 )
     except KeyboardInterrupt:
         L, alpha, segment_length, Ne = update(N, g, z_c, z_nc, mu, l_m)
@@ -304,22 +304,24 @@ if __name__ == "__main__":
     beta = 10
     z_c = beta * g
     N = 100
-    mu = 1e-3
+    mu = 1e-4
     l_m = 10
 
     nc_proportion = 0
     z_nc = nc_proportion * z_c / (1 - nc_proportion)
-    print(biais_z_nc(g=g, z_c=z_c, z_nc=z_nc, N=N, mu=mu, l_m=l_m))
+    print(
+        f"Current biais for z_nc = {z_nc}: {biais_z_nc(g=g, z_c=z_c, z_nc=z_nc, N=N, mu=mu, l_m=l_m)}"
+    )
 
     find_z_nc(g=g, z_c=z_c, Ne=N, mu=mu, l_m=l_m)
 
-    iterate(
-        g=g,
-        z_c=z_c,
-        z_nc=z_nc,
-        N=N,
-        mu=mu,
-        l_m=l_m,
-        iterations=1000,
-        time_acceleration=1,
-    )
+    # iterate(
+    #     g=g,
+    #     z_c=z_c,
+    #     z_nc=z_nc,
+    #     N=N,
+    #     mu=mu,
+    #     l_m=l_m,
+    #     iterations=1000,
+    #     time_acceleration=1,
+    # )

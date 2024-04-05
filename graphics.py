@@ -73,7 +73,7 @@ def save_checkpoint(
 
 def plot_simulation(
     x_value: npt.NDArray[np.int_],
-    y_value: npt.NDArray[np.float_],
+    y_value: npt.NDArray[np.float_] | tuple,
     std_values: npt.NDArray[np.float_] | None,
     save_path: Path,
     name: str,
@@ -81,8 +81,12 @@ def plot_simulation(
 ):
     save_path.mkdir(parents=True, exist_ok=True)
     plt.clf()
-    plt.plot(x_value, y_value, marker="o", label="Estimation")
-    # plt.errorbar(x_value, y_value, std_values, linestyle="None", marker="o")
+    if type(y_value) == tuple:
+        plt.plot(x_value, y_value[0], marker="o", label="Estimation")
+        plt.plot(x_value, y_value[1], marker="o", label="Theoretical")
+    else:
+        plt.plot(x_value, y_value, marker="o", label="Estimation")
+        # plt.errorbar(x_value, y_value, std_values, linestyle="None", marker="o")
     plt.title(f"{name} over generations")
     plt.xlabel("Generation")
     plt.ylabel(f"{name}")

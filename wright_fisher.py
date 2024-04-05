@@ -1,8 +1,7 @@
 import json
-from copy import deepcopy
 import pickle as pkl
 from collections import Counter
-from pathlib import Path
+from math_model import R
 from time import perf_counter
 from multiprocessing import Process
 import traceback
@@ -11,7 +10,6 @@ import numpy as np
 from argparse import Namespace
 
 import graphics
-from genome import Genome
 from mutations import Mutation
 from utils import str_to_int, QUANTILES
 from simulation import Simulation
@@ -199,13 +197,14 @@ class WrightFisher(Simulation):
         mutation_per_genome: dict[int, np.ndarray] = self.compute_mutation_number()
 
         self.livings = np.ones(len(self.genomes), dtype=bool)
-        changed_counter = self.iterate_genomes(mutation_per_genome)
 
+        changed_counter = self.iterate_genomes(mutation_per_genome)
+        # print(f"Living proportion: {self.livings.sum() / self.population}")
         if not self.livings.any():
             raise RuntimeError(f"All individuals died on generation {generation}")
 
         if generation % self.plot_point == 0 or generation == 1:
-            self.logging_and_plotting(changed_counter, generation)
+            self.logging_and_plotting(changed_counter, generation, mutation_per_genome)
 
     def prepare_parents(
         self,
@@ -231,10 +230,15 @@ class WrightFisher(Simulation):
         """
         lengths = np.array([genome.length for genome in self.genomes])
         total_bases_number = lengths.sum()
+        # print(f"Total bases number: {total_bases_number}")
+        # print(f"Total mutation rate: {self.total_mutation_rate}")
+        # print(f"Esperance: {total_bases_number * self.total_mutation_rate}")
         genomes_biases = lengths / total_bases_number
+        # print(f"Genomes biases: {genomes_biases}")
         mutation_number = self.rng.binomial(
             total_bases_number, self.total_mutation_rate
         )
+        # print(f"Mutation number: {mutation_number}")
         mutant_parent_indices = self.rng.choice(
             self.population, size=mutation_number, p=genomes_biases
         )
@@ -266,12 +270,22 @@ class WrightFisher(Simulation):
         # This seems faster (only a few seconds on the test used), TODO: check with other tests.
         self.mutant_parent_indices_counter.clear()
         self.mutant_parent_indices_counter.update(mutant_parent_indices)
+        # print(f"Mutant parent indices counter: {self.mutant_parent_indices_counter}")
         mutation_per_genome: dict[int, np.ndarray] = {
             mutant_parent_index: np.array(
                 [self.mutations_applied.pop() for _ in range(mutation_applied)]
             )
             for mutant_parent_index, mutation_applied in self.mutant_parent_indices_counter.items()
         }
+        # print(
+        #     f"Mutation per genome: {[(self.genomes[genome].length, len(mut_applied)) for genome, mut_applied in mutation_per_genome.items()]}"
+        # )
+        # print(f"len(mutation_per_genome): {len(mutation_per_genome)}")
+        # print(
+        #     f"Nombre mut: {sum([len(muts) for muts in mutation_per_genome.values()])}"
+        # )
+
+        # print(f"Mutation per genome: {mutation_per_genome}")
         return mutation_per_genome
 
     def iterate_genomes(
@@ -308,6 +322,7 @@ class WrightFisher(Simulation):
         self,
         changed_counter: int,
         generation: int,
+        mutation_per_genome,
     ) -> None:
         # z_nc_array = self.vec_get_genome_z_nc(self.genomes[self.livings])
         z_nc_array = np.array([genome.z_nc for genome in self.genomes[self.livings]])
@@ -324,13 +339,17 @@ class WrightFisher(Simulation):
                 for genome in self.genomes[self.livings]
             ]
         )
-
-        living_proportion = self.livings.sum() / self.population
+        living_sum = self.livings.sum()
+        living_proportion = living_sum / self.population
         change_proportion = changed_counter / self.population
         population_stats = {
             "Living child proportion": living_proportion,
             "Changed proportion": change_proportion,
             "z_nc_array": z_nc_array,
+            "neutral_mutant": (
+                len(mutation_per_genome) - (self.population - living_sum)
+            )
+            / self.population,
         }
         graphics.save_checkpoint(
             self.save_path / "logs", genomes_stats, population_stats, generation
@@ -365,6 +384,8 @@ class WrightFisher(Simulation):
         population_z_ncs = np.empty((len(x_values), len(QUANTILES)), dtype=np.float32)
 
         living_child_proportions = np.empty(len(x_values), dtype=np.float32)
+
+        neutral_mutants = np.empty(len(x_values), dtype=np.float32)
 
         changed_proporions = np.empty(len(x_values), dtype=np.float32)
 
@@ -428,6 +449,7 @@ class WrightFisher(Simulation):
             living_child_proportions[index] = population_raw_stats[
                 "Living child proportion"
             ]
+            neutral_mutants[index] = population_raw_stats["neutral_mutant"]
 
             changed_proporions[index] = population_raw_stats["Changed proportion"]
 
@@ -447,6 +469,15 @@ class WrightFisher(Simulation):
             None,
             save_dir,
             "Living child proportion",
+            ylim=-1,
+        )
+
+        graphics.plot_simulation(
+            x_values,
+            neutral_mutants,
+            None,
+            save_dir,
+            "Neutral mutants",
             ylim=-1,
         )
 
