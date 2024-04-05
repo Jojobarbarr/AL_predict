@@ -174,18 +174,9 @@ class Mutation:
         Returns:
             bool: True if ending point is ok, False otherwise.
         """
-        if self._bernoulli(1 / 2):
-            # Going forward
-            orientation = 0
-            # Handle the case when starting point is between last promoter and ORI.
-            if next_promoter_locus_index == len(self.genome.loci):
-                next_promoter_locus = self.genome.length + self.genome.loci[0]
-        else:
-            # Going backward
-            orientation = -1
-            if next_promoter_locus_index == 0:
-                previous_promoter_index = 0 - (self.genome.length - self.genome.loci[-1])
-        
+        # Handle the case when starting point is between last promoter and ORI.
+        if next_promoter_locus_index == len(self.genome.loci):
+            next_promoter_locus = self.genome.length + self.genome.loci[0]
         else:
             next_promoter_locus = self.genome.loci[next_promoter_locus_index]
         if self.length <= next_promoter_locus - starting_locus:
