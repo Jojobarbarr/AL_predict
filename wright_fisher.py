@@ -10,6 +10,7 @@ import numpy as np
 from argparse import Namespace
 
 import graphics
+from genome import Genome
 from mutations import Mutation
 from utils import str_to_int, QUANTILES
 from simulation import Simulation
@@ -211,14 +212,20 @@ class WrightFisher(Simulation):
     ) -> None:
         """Generate new population with living genomes and deepcopy parents that are duplicates."""
         living_genomes: np.ndarray[Any, Any] = self.genomes[self.livings]
-        double_number: int = self.population - self.livings.sum()
-        clones: np.ndarray[Any, Any] = self.rng.choice(
-            living_genomes, size=double_number
-        )  # TODO: try to predraw the indices without introducing a bias.
-        clone_parents: np.ndarray[Any, Any] = np.array(
-            [genome.clone() for genome in clones]
+        intermediate_population = self.rng.choice(
+            living_genomes, size=self.population, replace=True
         )
-        self.genomes = np.concatenate((clone_parents, living_genomes))
+        genome_counts = Counter(intermediate_population)
+        unique_genomes = len(genome_counts)
+        new_population = np.empty_like(self.genomes)
+        clone_count = 0
+        for genome_index, (genome, clones) in enumerate(genome_counts.items()):
+            new_population[genome_index] = genome
+            new_population[
+                unique_genomes + clone_count : unique_genomes + clone_count + clones - 1
+            ] = np.array([genome.clone() for _ in range(clones - 1)])
+            clone_count += clones - 1
+        self.genomes = new_population
 
     def compute_mutation_number(
         self,

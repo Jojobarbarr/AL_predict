@@ -88,7 +88,7 @@ class TestGenome(unittest.TestCase):
         )
         genome.compute_intervals()
         self.assertListEqual(
-            genome.loci_interval.tolist(), [1, 0, 5, 4, 6, 7, 1, 0, 6, 20]
+            genome.loci_interval.tolist(), [20, 1, 0, 5, 4, 6, 7, 1, 0, 6]
         )
 
     @parameterized.expand(

@@ -91,8 +91,9 @@ class Mutagenese(Experiment):
                 z_nc = z_nc_factor * g
             else:
                 z_nc = str_to_int(self.genome_config["z_nc"])
-
-        return Genome(g, z_c, z_nc, self.homogeneous, self.orientation)  # type: ignore
+        genome = Genome(g, z_c, z_nc, self.homogeneous, self.orientation)
+        genome.compute_intervals()
+        return genome
 
     def loop(
         self,

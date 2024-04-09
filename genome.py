@@ -95,14 +95,15 @@ class Genome:
         return loci, orientation
 
     def compute_intervals(self):
-        nc_at_junction = self.length + self.loci[0] - self.loci[-1] - self.gene_length
         self.loci_interval = np.array(
             [
                 self.loci[i] - self.loci[i - 1] - self.gene_length
-                for i in range(1, len(self.loci))
-            ]
-            + [nc_at_junction],
+                for i in range(0, len(self.loci))
+            ],
             dtype=np.int_,
+        )
+        self.loci_interval[0] = (
+            self.length + self.loci[0] - self.loci[-1] - self.gene_length
         )
 
     def insertion_binary_search(self, target: int) -> int:

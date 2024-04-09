@@ -304,7 +304,7 @@ if __name__ == "__main__":
     beta = 10
     z_c = beta * g
     N = 100
-    mu = 1e-4
+    mu = 1e-3
     l_m = 10
 
     nc_proportion = 0
