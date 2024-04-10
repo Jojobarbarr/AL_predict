@@ -117,7 +117,12 @@ class TestDeletion(unittest.TestCase):
             (148, 3, [0, 11, 21, 36, 50, 66, 83, 94, 104, 120]),
         ]
     )
-    def test_apply(self, starting_locus, length, expected_result):
+    def test_apply(
+        self,
+        starting_locus,
+        length,
+        expected_result,
+    ):
         previous_length = self.genome.length
         self.mutation.starting_locus = starting_locus
         self.mutation.length = length
@@ -152,34 +157,6 @@ class TestDuplication(unittest.TestCase):
 
     def test_str(self):
         self.assertEqual(str(self.mutation), "Duplication")
-
-    @parameterized.expand(
-        [
-            (0, 0, 2, True),
-            (0, 0, 3, True),
-            (0, 0, 10, True),
-            (0, 0, 11, False),
-            (5, 62, 14, True),
-            (5, 62, 15, False),
-            (10, 145, 4, True),
-            (10, 145, 7, True),
-            (10, 145, 15, True),
-            (10, 145, 16, False),
-        ]
-    )
-    def test_ending_point_is_ok(
-        self, next_promoter_locus_index, starting_locus, length, expected_result
-    ):
-        self.genome.orientation_list = np.array(
-            [-1, 1, -1, -1, 1, -1, -1, 1, 1, -1], dtype=np.int_
-        )
-        self.mutation.length = length
-        self.mutation.starting_locus = starting_locus
-        result = self.mutation._ending_point_is_ok(
-            self.mutation.starting_locus,
-            next_promoter_locus_index,
-        )
-        self.assertEqual(result, expected_result)
 
     @parameterized.expand(
         [

@@ -9,3 +9,4 @@ lib64
 results*/
 logs*/
 *.sh
+wild_type/

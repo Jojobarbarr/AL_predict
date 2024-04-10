@@ -153,7 +153,10 @@ class Simulation(Experiment):
         )
 
     def set_z(self, z_type: str) -> int:
-        z_factor = str_to_int(self.genome_config[f"{z_type}_factor"])
+        if z_type == "z_c":
+            z_factor = str_to_int(self.genome_config["beta"])
+        else:
+            z_factor = str_to_int(self.genome_config["alpha"])
         if self.genome_config[f"{z_type}_auto"]:
             return z_factor * str_to_int(self.genome_config["g"])
         return str_to_int(self.genome_config[z_type])

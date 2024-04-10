@@ -6,14 +6,14 @@ from genome import Genome
 
 if __name__ == "__main__":
     nbr_replicas = 5
-    population = int(1e3)
-    save_path = Path("wild_type/0_0/")
+    population = 1024
+    save_path = Path("wild_type/0_0_model/")
     genomes = np.empty((nbr_replicas * population), dtype=Genome)
 
     for replica in range(nbr_replicas):
         print(f"Replica {replica + 1}")
         with open(
-            f"results/simulation/0_0/{replica + 1}/populations/final", "rb"
+            f"results/simulation/0_0/{replica + 1}/populations/10000000", "rb"
         ) as pkl_file:
             genomes_loaded = pkl.load(pkl_file)
             genomes[replica * population : population * (replica + 1)] = np.array(
