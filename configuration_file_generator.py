@@ -143,7 +143,7 @@ class ConfigGenerator(QWidget):
 
         # AUTO_Z_C
         self.auto_z_c_checkbox = QCheckBox()
-        self.auto_z_c_checkbox.setText("Keep z_c to: ")
+        self.auto_z_c_checkbox.setText("\u03B2: ")
         self.auto_z_c_checkbox.stateChanged.connect(self.auto_z_c_change)
         genome_layout.addWidget(self.auto_z_c_checkbox, 1, 0)
 
@@ -152,12 +152,9 @@ class ConfigGenerator(QWidget):
         self.z_c_factor_edit.setEnabled(False)
         genome_layout.addWidget(self.z_c_factor_edit, 1, 1)
 
-        self.z_c_factor_label = QLabel("g")
-        genome_layout.addWidget(self.z_c_factor_label, 1, 2)
-
         # AUTO_Z_NC
         self.auto_z_nc_checkbox = QCheckBox()
-        self.auto_z_nc_checkbox.setText("Keep z_nc to: ")
+        self.auto_z_nc_checkbox.setText("Initial \u03B1: ")
         self.auto_z_nc_checkbox.stateChanged.connect(self.auto_z_nc_change)
         genome_layout.addWidget(self.auto_z_nc_checkbox, 2, 0)
 
@@ -165,9 +162,6 @@ class ConfigGenerator(QWidget):
         self.z_nc_factor_edit.setText("1000")
         self.z_nc_factor_edit.setEnabled(False)
         genome_layout.addWidget(self.z_nc_factor_edit, 2, 1)
-
-        self.z_nc_factor_label = QLabel("g")
-        genome_layout.addWidget(self.z_nc_factor_label, 2, 2)
 
         # Z_C
         self.z_c_label = QLabel("z_c: ")
@@ -177,7 +171,7 @@ class ConfigGenerator(QWidget):
         genome_layout.addWidget(self.z_c_edit, 3, 1, 1, 2)
 
         # Z_NC
-        self.z_nc_label = QLabel("z_nc: ")
+        self.z_nc_label = QLabel("Initial z_nc: ")
         genome_layout.addWidget(self.z_nc_label, 4, 0)
         self.z_nc_edit = QLineEdit()
         self.z_nc_edit.setText("1e6")
@@ -504,10 +498,10 @@ class ConfigGenerator(QWidget):
             "g": g,
             "z_c": z_c,
             "z_c_auto": self.auto_z_c_checkbox.isChecked(),
-            "z_c_factor": z_c_factor,
+            "beta": z_c_factor,
             "z_nc": z_nc,
             "z_nc_auto": self.auto_z_nc_checkbox.isChecked(),
-            "z_nc_factor": z_nc_factor,
+            "alpha": z_nc_factor,
             "Homogeneous": self.homogeneous_checkbox.isChecked(),
             "Orientation": self.orientation_checkbox.isChecked(),
         }

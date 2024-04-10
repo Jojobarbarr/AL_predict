@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Any
 
 
 class Statistics:
@@ -61,16 +62,24 @@ class MutationStatistics(Statistics):
 
 
 class GenomeStatistics(Statistics):
-    def __init__(self) -> None:
-        self.nc_proportion = 0
-        self.intervals_between_loci = np.empty(0)
-        self.d_stats = {}
+    def __init__(
+        self,
+        nc_proportion: float = 0,
+        intervals_between_loci: np.ndarray[Any, np.dtype[np.int_]] = np.zeros(
+            (0), dtype=int
+        ),
+    ) -> None:
+        self.nc_proportion = nc_proportion
+        self.intervals_between_loci = intervals_between_loci
+        self.d_stats = {
+            "Non coding proportion": self.nc_proportion,
+            "Non coding length list": self.intervals_between_loci,
+        }
 
     def clone(self):
-        clone = GenomeStatistics()
-        clone.nc_proportion = self.nc_proportion
-        clone.intervals_between_loci = self.intervals_between_loci.copy()
-        clone.d_stats = self.d_stats.copy()
+        nc_proportion = self.nc_proportion
+        intervals_between_loci = self.intervals_between_loci.copy()
+        clone = GenomeStatistics(nc_proportion, intervals_between_loci)
         return clone
 
     def compute(self, genome) -> None:

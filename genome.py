@@ -1,7 +1,10 @@
 import random as rd
+import traceback
 import numpy as np
 
 from stats import GenomeStatistics
+
+COUNTER = 0
 
 
 class Genome:
@@ -13,6 +16,9 @@ class Genome:
         homogeneous: bool = False,
         orientation: bool = False,
     ):
+        global COUNTER
+        COUNTER += 1
+        self.counter = COUNTER
         if g == 1 and z_c == 1 and z_nc == 1:
             # Dummy genome, no calculation will be done on it.
             return None
@@ -52,9 +58,9 @@ class Genome:
         genome.g = self.g
         genome.homogeneous = self.homogeneous
         genome.orientation = self.orientation
-        genome.stats = self.stats.clone()
         genome.gene_length = self.gene_length
         genome.max_length_neutral = self.max_length_neutral
+        genome.stats = self.stats.clone()
         genome.loci = self.loci.copy()
         genome.orientation_list = self.orientation_list.copy()
         genome.loci_interval = self.loci_interval.copy()
@@ -90,15 +96,21 @@ class Genome:
         return loci, orientation
 
     def compute_intervals(self):
-        nc_at_junction = self.length + self.loci[0] - self.loci[-1] - self.gene_length
         self.loci_interval = np.array(
             [
                 self.loci[i] - self.loci[i - 1] - self.gene_length
-                for i in range(1, len(self.loci))
-            ]
-            + [nc_at_junction],
+                for i in range(len(self.loci))
+            ],
             dtype=np.int_,
         )
+        self.loci_interval[0] = (
+            self.length + self.loci[0] - self.loci[-1] - self.gene_length
+        )
+        if self.loci_interval[self.loci_interval < 0].any():
+            print(self.loci)
+            print(self.loci_interval)
+            print(traceback.print_stack())
+            raise ValueError("Negative interval detected.")
 
     def insertion_binary_search(self, target: int) -> int:
         if target < 0 or target > self.z_nc + self.g:
@@ -162,7 +174,7 @@ class Genome:
     def blend(self):
         nc_lengths = self.z_nc // self.g
         remaining_nc = self.z_nc % self.g
-        distance_between_promoters = self.gene_length + nc_lengths
+        distance_between_promoters = nc_lengths
         self.loci_interval = np.array(
             [distance_between_promoters for _ in range(self.g)], dtype=np.int_
         )
@@ -170,8 +182,11 @@ class Genome:
         self.loci_interval[remaining_insertions] += 1
 
         self.loci = np.cumsum(self.loci_interval)
-        self.loci_interval = self.loci_interval - self.gene_length
-        self.loci = np.concatenate(([0], self.loci[:-1]))
+        self.loci = np.array(
+            [locus + index * self.gene_length for index, locus in enumerate(self.loci)],
+            dtype=np.int_,
+        )
+
         self.orientation_list = np.array([1 for _ in range(self.g)], dtype=np.int_)
         self.update_features(skip_intervals=True)
         return self
