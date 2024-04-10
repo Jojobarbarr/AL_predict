@@ -239,7 +239,7 @@ class TestGenome(unittest.TestCase):
         )
         genome.blend()
         self.assertListEqual(
-            genome.loci.tolist(), [0, 15, 30, 45, 60, 75, 90, 105, 120, 135]
+            genome.loci.tolist(), [5, 20, 35, 50, 65, 80, 95, 110, 125, 140]
         )
 
     def test_blend_not_fully_homogeneous(self):
@@ -251,7 +251,7 @@ class TestGenome(unittest.TestCase):
         with patch("random.sample", return_value=[0, 1, 9]):
             genome.blend()
         self.assertListEqual(
-            genome.loci.tolist(), [0, 16, 32, 47, 62, 77, 92, 107, 122, 137]
+            genome.loci.tolist(), [6, 22, 37, 52, 67, 82, 97, 112, 127, 143]
         )
         self.assertEqual(genome.length, 153)
 

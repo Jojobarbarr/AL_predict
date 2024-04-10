@@ -86,12 +86,16 @@ class Mutation:
     def _pick_segment(
         self,
     ) -> int:
-        if self.genome.loci_interval.all() == 0:
-            return False
-        segment = self.rng.choice(
-            len(self.genome.loci_interval),
-            p=self.genome.loci_interval / self.genome.z_nc,
-        )
+        try:
+            if self.genome.loci_interval.all() == 0:
+                return False
+            segment = self.rng.choice(
+                len(self.genome.loci_interval),
+                p=self.genome.loci_interval / self.genome.z_nc,
+            )
+        except ValueError:
+            print(self.genome.loci_interval)
+            raise Exception
         return segment
 
     def _bernoulli(
@@ -284,6 +288,7 @@ class Deletion(Mutation):
         """
         super().__init__(genome)
         self.starting_locus = 0
+        self.orientation = 1
 
     def is_neutral(
         self,
@@ -295,6 +300,10 @@ class Deletion(Mutation):
         if not self._length_is_ok():
             return False
         segment = int(self._pick_segment())
+        # print(f"length: {self.length}")
+        # print(f"segment: {segment}")
+        # print(f"loci: {self.genome.loci}")
+        # print(f"interval: {self.genome.loci_interval}")
         if self.length > self.genome.loci_interval[segment]:
             return False
         if segment == 0:
@@ -308,19 +317,24 @@ class Deletion(Mutation):
                 self.genome.loci[segment - 1] + self.genome.gene_length
             )
         last_neutral_locus = self.genome.loci[segment]
+        # print(f"first_neutral_locus: {first_neutral_locus}")
+        # print(f"last_neutral_locus: {last_neutral_locus}")
         self.starting_locus = self.rng.integers(
             first_neutral_locus,
             last_neutral_locus,
-            endpoint=True,
         )
+        # print(f"starting_locus: {self.starting_locus}")
         if self._bernoulli(1 / 2):
             # deletion is forward
             if self.starting_locus + self.length - 1 > last_neutral_locus:
                 return False
+            self.orientation = 1
             return True
         # deletion is backward
         if self.starting_locus - self.length + 1 < first_neutral_locus:
             return False
+        self.starting_locus = self.starting_locus - self.length + 1
+        self.orientation = -1
         return True
 
     def apply(
@@ -332,12 +346,11 @@ class Deletion(Mutation):
         Args:
             virtually (bool, optional): If True, the genome isn't modified. Defaults to False.
         """
+        # print(f"orientation: {self.orientation}")
+        # print(f"length: {self.length}")
+        # print(f"loci: {self.genome.loci}")
+        # print(f"interval: {self.genome.loci_interval}")
         if not virtually:
-            # If deletion is between the last promoter and the first, we need to proceed with two steps:
-            # - Deletion from starting point to ORI
-            # - Deletion from ORI to first promoter
-            # without deleting more than self.length
-            prev_z_nc = self.genome.z_nc
             if self.starting_locus < 0:
                 self.starting_locus += self.genome.length
             if self.starting_locus > self.genome.loci[-1]:
@@ -417,6 +430,7 @@ class Duplication(Mutation):
         """
         super().__init__(genome)
         self.starting_locus = 0
+        self.orientation = 1
 
     def _first_neutral_locus(
         self,
@@ -467,33 +481,39 @@ class Duplication(Mutation):
             return False
         segment = self._pick_segment()
         corrector = 1
-        reverse = False
+        first_neutral_reverse = False
+        last_neutral_reverse = False
         if self.genome.orientation_list[segment - 1] == -1:
             corrector -= 1
-            reverse = True
+            first_neutral_reverse = True
         if self.genome.orientation_list[segment] == -1:
             corrector += 1
+            last_neutral_reverse = True
         neutral_length = self.genome.loci_interval[segment] + corrector * (
             self.genome.gene_length - 1
         )
         if self.length > neutral_length:
             return False
-        first_neutral_locus = self._first_neutral_locus(segment, reverse)
+        first_neutral_locus = self._first_neutral_locus(segment, first_neutral_reverse)
+        if last_neutral_reverse:
+            last_neutral_locus = self.genome.loci[segment] + self.genome.gene_length - 1
         last_neutral_locus = self.genome.loci[segment]
 
         self.starting_locus = self.rng.integers(
             first_neutral_locus,
             last_neutral_locus,
-            endpoint=True,
         )
-        if self._bernoulli(1 - self.genome.g / self.genome.length):
+        if self._bernoulli(1 / 2):
             # duplication is forward
             if self.starting_locus + self.length - 1 > last_neutral_locus:
                 return False
+            self.orientation = 1
             return True
         # deletion is backward
         if self.starting_locus - self.length + 1 < first_neutral_locus:
             return False
+        self.orientation = -1
+        self.starting_locus = self.starting_locus - self.length + 1
         return True
 
     def apply(

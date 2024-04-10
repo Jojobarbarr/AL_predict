@@ -1,4 +1,5 @@
 import random as rd
+import traceback
 import numpy as np
 
 from stats import GenomeStatistics
@@ -98,13 +99,18 @@ class Genome:
         self.loci_interval = np.array(
             [
                 self.loci[i] - self.loci[i - 1] - self.gene_length
-                for i in range(0, len(self.loci))
+                for i in range(len(self.loci))
             ],
             dtype=np.int_,
         )
         self.loci_interval[0] = (
             self.length + self.loci[0] - self.loci[-1] - self.gene_length
         )
+        if self.loci_interval[self.loci_interval < 0].any():
+            print(self.loci)
+            print(self.loci_interval)
+            print(traceback.print_stack())
+            raise ValueError("Negative interval detected.")
 
     def insertion_binary_search(self, target: int) -> int:
         if target < 0 or target > self.z_nc + self.g:
@@ -168,7 +174,7 @@ class Genome:
     def blend(self):
         nc_lengths = self.z_nc // self.g
         remaining_nc = self.z_nc % self.g
-        distance_between_promoters = self.gene_length + nc_lengths
+        distance_between_promoters = nc_lengths
         self.loci_interval = np.array(
             [distance_between_promoters for _ in range(self.g)], dtype=np.int_
         )
@@ -176,8 +182,11 @@ class Genome:
         self.loci_interval[remaining_insertions] += 1
 
         self.loci = np.cumsum(self.loci_interval)
-        self.loci_interval = self.loci_interval - self.gene_length
-        self.loci = np.concatenate(([0], self.loci[:-1]))
+        self.loci = np.array(
+            [locus + index * self.gene_length for index, locus in enumerate(self.loci)],
+            dtype=np.int_,
+        )
+
         self.orientation_list = np.array([1 for _ in range(self.g)], dtype=np.int_)
         self.update_features(skip_intervals=True)
         return self

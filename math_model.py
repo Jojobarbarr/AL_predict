@@ -1,8 +1,13 @@
 import numpy as np
+from argparse import ArgumentParser
+from pathlib import Path
 from time import perf_counter
 import matplotlib.pyplot as plt
 from scipy.optimize import bisect
+import json
 from decimal import Decimal, getcontext
+
+from utils import str_to_int
 
 getcontext().prec = 40
 
@@ -198,8 +203,8 @@ def iterate(g, z_c, z_nc, N, mu, l_m, iterations, time_acceleration):
     L, alpha, segment_length, Ne = update(N, g, z_c, z_nc, mu, l_m)
     print(f"Initial living proportion: {Ne / N}")
     progress_point = iterations // 20
-    nc_proportions = []
-    Nes = []
+    nc_proportions = [z_nc / L]
+    Nes = [Ne]
 
     start_time = perf_counter()
     try:
@@ -238,30 +243,7 @@ def iterate(g, z_c, z_nc, N, mu, l_m, iterations, time_acceleration):
         L, alpha, segment_length, Ne = update(N, g, z_c, z_nc, mu, l_m)
     print(f"Iterations: {iteration}")
     print(f"Final non-coding proportion: {z_nc / L} (z_nc = {z_nc})")
-    plt.clf()
-    plt.plot(nc_proportions)
-    plt.title("Non-coding proportion over iterations")
-    plt.xlabel("Iteration")
-    plt.ylabel("Non-coding proportion")
-    plt.show()
-    plt.clf()
-    plt.plot(Nes)
-    plt.title("Effective population size over iterations")
-    plt.xlabel("Iteration")
-    plt.ylabel("Ne")
-    plt.show()
-    plt.clf()
-    plt.plot([Ne / N for Ne in Nes])
-    plt.title("Living proportion over iterations")
-    plt.xlabel("Iteration")
-    plt.ylabel("Living proportion")
-    plt.show()
-    plt.clf()
-    plt.plot([Ne / N for Ne in Nes], nc_proportions)
-    plt.title("Living proportion over non-coding proportion")
-    plt.xlabel("Living proportion")
-    plt.ylabel("Non-coding proportion")
-    plt.show()
+    return nc_proportions, Nes
 
 
 def funcTargetN(
@@ -290,38 +272,79 @@ def find_z_nc(
 
 
 if __name__ == "__main__":
-    # start = perf_counter()
-    # for _ in range(1000):
-    #     biais_z_nc(z_c=100, z_nc=100, g=10, Ne=100, mu=0.001, l_m=10)
-    # end = perf_counter()
-    # print(biais_z_nc(z_c=100, z_nc=100, g=10, Ne=100, mu=0.001, l_m=10))
-    # print(biais_z_nc(z_c=1000, z_nc=100, g=100, Ne=100, mu=0.0001, l_m=10))
-    # print(biais_z_nc(z_c=1000, z_nc=1000, g=100, Ne=100, mu=0.0001, l_m=10))
-    # print(biais_z_nc(z_c=1000, z_nc=1000, g=100, Ne=100, mu=0.0001, l_m=1000))
-    # print(f"Time: {end - start}")
+    parser = ArgumentParser()
+    parser.add_argument("config", type=Path, help="Path to the config file")
+    parser.add_argument(
+        "-i", "--iterations", type=int, required=True, help="Number of iterations"
+    )
+    parser.add_argument(
+        "-t",
+        "--time_acceleration",
+        type=int,
+        default=1,
+        help="Time acceleration factor (1 iteration = time_acceleration generations)",
+    )
+    args = parser.parse_args()
 
-    g = 10
-    beta = 10
-    z_c = beta * g
-    N = 64
-    mu = 0.00001
-    l_m = 10
+    with open(args.config, "r", encoding="utf8") as json_file:
+        config = json.load(json_file)
 
-    nc_proportion = 0
-    z_nc = nc_proportion * z_c / (1 - nc_proportion)
+    result_dir = Path(config["Paths"]["Save"])
+
+    g = str_to_int(config["Genome"]["g"])
+
+    if config["Genome"]["z_c_auto"]:
+        beta = str_to_int(config["Genome"]["beta"])
+        z_c = beta * g
+    else:
+        z_c = str_to_int(config["Genome"]["z_c"])
+        beta = z_c / g
+
+    N = str_to_int(config["Simulation"]["Population size"])
+    mu = float(config["Mutation rates"]["Point mutation"])
+    l_m = str_to_int(config["Mutations"]["l_m"])
+
+    if config["Genome"]["z_nc_auto"]:
+        alpha = str_to_int(config["Genome"]["alpha"])
+        z_nc = alpha * g
+    else:
+        z_nc = str_to_int(config["Genome"]["z_nc"])
+        alpha = z_nc / g
+
     print(
         f"Current biais for z_nc = {z_nc}: {biais_z_nc(g=g, z_c=z_c, z_nc=z_nc, N=N, mu=mu, l_m=l_m)}"
     )
 
-    find_z_nc(g=g, z_c=z_c, Ne=N, mu=mu, l_m=l_m)
+    # find_z_nc(g=g, z_c=z_c, Ne=N, mu=mu, l_m=l_m)
 
-    iterate(
+    print(f"g: {g}, z_c: {z_c}, z_nc: {z_nc}, N: {N}, mu: {mu}, l_m: {l_m}")
+    results = iterate(
         g=g,
         z_c=z_c,
         z_nc=z_nc,
         N=N,
         mu=mu,
         l_m=l_m,
-        iterations=1000,
-        time_acceleration=500,
+        iterations=args.iterations,
+        time_acceleration=args.time_acceleration,
     )
+    result_dir /= "_iterative_model"
+    result_dir.mkdir(parents=True, exist_ok=True)
+    nc_proportions = np.array(results[0])
+    np.save(result_dir / "nc_proportions.npy", nc_proportions)
+    Nes = np.array(results[1])
+    np.save(result_dir / "Nes.npy", Nes)
+    with open(result_dir / "config.json", "w", encoding="utf8") as json_file:
+        json.dump(
+            {
+                "Iterations": args.iterations,
+                "Time acceleration": args.time_acceleration,
+            },
+            json_file,
+        )
+    plt.plot(nc_proportions)
+    plt.title("Non-coding proportion")
+    plt.xlabel("Iteration")
+    plt.ylabel("Proportion")
+    plt.show()
+    plt.savefig(result_dir / "nc_proportions.png")

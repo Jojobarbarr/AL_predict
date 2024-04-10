@@ -498,10 +498,10 @@ class ConfigGenerator(QWidget):
             "g": g,
             "z_c": z_c,
             "z_c_auto": self.auto_z_c_checkbox.isChecked(),
-            "z_c_factor": z_c_factor,
+            "beta": z_c_factor,
             "z_nc": z_nc,
             "z_nc_auto": self.auto_z_nc_checkbox.isChecked(),
-            "z_nc_factor": z_nc_factor,
+            "alpha": z_nc_factor,
             "Homogeneous": self.homogeneous_checkbox.isChecked(),
             "Orientation": self.orientation_checkbox.isChecked(),
         }

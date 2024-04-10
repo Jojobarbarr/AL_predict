@@ -117,9 +117,6 @@ class TestDeletion(unittest.TestCase):
             (148, 3, [0, 11, 21, 36, 50, 66, 83, 94, 104, 120]),
         ]
     )
-    def test_is_neutral():
-        pass
-
     def test_apply(
         self,
         starting_locus,
