@@ -294,7 +294,7 @@ class Deletion(Mutation):
         self.length = self._set_length()
         if not self._length_is_ok():
             return False
-        segment = self._pick_segment()
+        segment = int(self._pick_segment())
         if self.length > self.genome.loci_interval[segment]:
             return False
         if segment == 0:
@@ -337,6 +337,7 @@ class Deletion(Mutation):
             # - Deletion from starting point to ORI
             # - Deletion from ORI to first promoter
             # without deleting more than self.length
+            prev_z_nc = self.genome.z_nc
             if self.starting_locus < 0:
                 self.starting_locus += self.genome.length
             if self.starting_locus > self.genome.loci[-1]:

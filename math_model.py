@@ -283,7 +283,7 @@ def find_z_nc(
     mu,
     l_m,
 ):
-    max_proportion = 0.9
+    max_proportion = 0.99
     max = max_proportion * z_c / (1 - max_proportion)
     z_nc = bisect(funcTargetN, 0, int(max), args=(g, z_c, Ne, mu, l_m))
     print(f"Final proportion: {z_nc / (z_c + z_nc)} (z_nc = {z_nc})")
@@ -303,8 +303,8 @@ if __name__ == "__main__":
     g = 10
     beta = 10
     z_c = beta * g
-    N = 100
-    mu = 1e-3
+    N = 64
+    mu = 0.00001
     l_m = 10
 
     nc_proportion = 0
@@ -315,13 +315,13 @@ if __name__ == "__main__":
 
     find_z_nc(g=g, z_c=z_c, Ne=N, mu=mu, l_m=l_m)
 
-    # iterate(
-    #     g=g,
-    #     z_c=z_c,
-    #     z_nc=z_nc,
-    #     N=N,
-    #     mu=mu,
-    #     l_m=l_m,
-    #     iterations=1000,
-    #     time_acceleration=1,
-    # )
+    iterate(
+        g=g,
+        z_c=z_c,
+        z_nc=z_nc,
+        N=N,
+        mu=mu,
+        l_m=l_m,
+        iterations=1000,
+        time_acceleration=500,
+    )
