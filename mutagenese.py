@@ -15,6 +15,7 @@ class Mutagenese(Experiment):
         super().__init__(config, args)
         self.variable = self.mutagenese_config["Variable"]
         self.l_m = int(self.mutations_config["l_m"])
+        self.mutation_length_distribution = self.mutations_config["length_distribution"]
         self.homogeneous = self.genome_config["Homogeneous"]
         self.orientation = self.genome_config["Orientation"]
 
@@ -41,9 +42,15 @@ class Mutagenese(Experiment):
                 for mutation, name in zip(self.mutation_types, self.mutation_names):
                     print(f"Mutation type: {name}")
                     if name in L_M:
-                        self.results[name][888] = self.loop(mutation(self.l_m, genome))
+                        self.results[name][888] = self.loop(
+                            mutation(
+                                self.l_m, self.mutation_length_distribution, genome
+                            )
+                        )
                     else:
-                        self.results[name][888] = self.loop(mutation(genome))
+                        self.results[name][888] = self.loop(
+                            mutation(self.mutation_length_distribution, genome)
+                        )
                 del genome  # genome can be very large
 
             else:
@@ -54,10 +61,14 @@ class Mutagenese(Experiment):
                         print(f"Mutation type: {name}")
                         if name in L_M:
                             self.results[name][power] = self.loop(
-                                mutation(self.l_m, genome)
+                                mutation(
+                                    self.l_m, self.mutation_length_distribution, genome
+                                )
                             )
                         else:
-                            self.results[name][power] = self.loop(mutation(genome))
+                            self.results[name][power] = self.loop(
+                                mutation(self.mutation_length_distribution, genome)
+                            )
                     del genome  # genome can be very large
 
             graphics.save_stats(self.save_path, self.results)

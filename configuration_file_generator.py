@@ -76,34 +76,6 @@ class ConfigGenerator(QWidget):
         )
         paths_layout.addWidget(self.select_save_directory_button, 0, 4)
 
-        # CHECKPOINT BOX
-        self.checkpoint_label = QLabel("Enable checkpointing: ")
-        paths_layout.addWidget(self.checkpoint_label, 1, 0)
-        self.checkpoint_checkbox = QCheckBox()
-        paths_layout.addWidget(self.checkpoint_checkbox, 1, 1)
-        self.checkpoint_checkbox.stateChanged.connect(self.handle_checkpoint_change)
-
-        # CHECKPOINT NUMBER
-        self.checkpoint_number_label = QLabel("Checkpoint number: ")
-        paths_layout.addWidget(self.checkpoint_number_label, 1, 2)
-        self.checkpoint_number_edit = QLineEdit()
-        self.checkpoint_number_edit.setText("100")
-        self.checkpoint_number_edit.textChanged.connect(self.handle_checkpoint_change)
-        paths_layout.addWidget(self.checkpoint_number_edit, 1, 3)
-        self.checkpoint_number_label_suffix = QLabel(f"")
-        paths_layout.addWidget(self.checkpoint_number_label_suffix, 1, 4)
-
-        # CHECKPOINT DIRECTORY
-        self.checkpoint_dir_label = QLabel("Checkpoint directory: ")
-        paths_layout.addWidget(self.checkpoint_dir_label, 2, 0)
-        self.checkpoint_dir_selected_label = QLabel()
-        paths_layout.addWidget(self.checkpoint_dir_selected_label, 2, 1, 1, 3)
-        self.select_checkpoint_directory_button = QPushButton("Select Directory")
-        self.select_checkpoint_directory_button.clicked.connect(
-            lambda: self.open_directory_dialog(self.checkpoint_dir_selected_label)
-        )
-        paths_layout.addWidget(self.select_checkpoint_directory_button, 2, 4)
-
         self.main_layout.addWidget(self.paths_groupbox, 0, 1)
 
         ## MUTATIONS ##
@@ -128,6 +100,13 @@ class ConfigGenerator(QWidget):
         mutations_layout.addWidget(self.l_m_edit, 1, 1)
 
         self.main_layout.addWidget(self.mutations_groupbox, 1, 0)
+
+        # LENGTHS
+        self.length_distribution_label = QLabel("Length distribution: ")
+        mutations_layout.addWidget(self.length_distribution_label, 2, 0)
+        self.length_distribution_combo = QComboBox()
+        self.length_distribution_combo.addItems(["Uniform", "Geometric"])
+        mutations_layout.addWidget(self.length_distribution_combo, 2, 1)
 
         ## GENOME ##
         self.genome_groupbox = QGroupBox("Genome")
@@ -386,7 +365,6 @@ class ConfigGenerator(QWidget):
         experiment_name = self.experiment_name_edit.text()
 
         if experiment_name != "":
-            self.handle_checkpoint_change()
             self.experiment_type_combo.setEnabled(True)
             for index in range(self.main_layout.count()):
                 item = self.main_layout.itemAt(index)
@@ -434,29 +412,9 @@ class ConfigGenerator(QWidget):
         if self.save_dir_selected_label.text() == "":
             self.error_box("Please provide a valid save directory.")
             return None
-        checkpoint_number = 0
-        if self.checkpoint_checkbox.isChecked():
-            checkpoint_number = self.checkpoint_number_edit.text()
-            if checkpoint_number == "":
-                try:
-                    checkpoint_number = str_to_int(checkpoint_number)
-                except ValueError:
-                    self.error_box(
-                        f"Please provide a valid checkpoint number. (Yours is {checkpoint_number})"
-                    )
-                    return None
-            if checkpoint_number == 0:
-                self.info_box("The checkpoint number can't be 0. Defaulting to 1.")
-                checkpoint_number = 1
-            elif self.checkpoint_dir_selected_label.text() == "":
-                self.error_box("Please provide a valid checkpoint directory.")
-                return None
 
         d_params["Paths"] = {
             "Save": self.save_dir_selected_label.text(),
-            "Checkpointing": self.checkpoint_checkbox.isChecked(),
-            "Checkpoint number": checkpoint_number,
-            "Checkpoint": self.checkpoint_dir_selected_label.text(),
         }
 
         ## MUTATIONS ##
@@ -467,6 +425,7 @@ class ConfigGenerator(QWidget):
                 if self.mutation_type_model.item(row).checkState() == QtCore.Qt.Checked
             ],
             "l_m": self.l_m_edit.text(),
+            "length_distribution": self.length_distribution_combo.currentText(),
         }
 
         def var_is_ok(var):
@@ -595,29 +554,6 @@ class ConfigGenerator(QWidget):
                     "The configuration file was successfully generated at:\n"
                     f"{save_file}"
                 )
-
-    def handle_checkpoint_change(self):
-        if self.checkpoint_checkbox.isChecked():
-            self.checkpoint_number_edit.setEnabled(True)
-            self.checkpoint_dir_selected_label.setEnabled(True)
-            self.checkpoint_dir_selected_label.setText(
-                str(
-                    Path(__file__).parent
-                    / "checkpoint"
-                    / self.experiment_type_combo.currentText().lower()
-                    / self.experiment_name_edit.text()
-                )
-            )
-            try:
-                self.checkpoint_number_label_suffix.setText(
-                    f"(Every {str_to_int(self.generation_edit.text()) // str_to_int(self.checkpoint_number_edit.text())} generations)"
-                )
-            except (ValueError, ZeroDivisionError):
-                self.checkpoint_number_label_suffix.setText("")
-        else:
-            self.checkpoint_number_edit.setEnabled(False)
-            self.checkpoint_dir_selected_label.setEnabled(False)
-            self.checkpoint_number_label_suffix.setText("")
 
     def handle_mutation_selection_change(self):
         for edit in self.rate_edit_list:

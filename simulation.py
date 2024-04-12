@@ -112,9 +112,9 @@ class Simulation(Experiment):
         self.mutations = np.array(
             [
                 (
-                    MUTATIONS[mutation_type](l_m=l_m)
+                    MUTATIONS[mutation_type](l_m=l_m, self.mutation_length_distribution)
                     if mutation_type in L_M
-                    else MUTATIONS[mutation_type]()
+                    else MUTATIONS[mutation_type](self.mutation_length_distribution)
                 )
                 for mutation_type in mutation_types
             ],

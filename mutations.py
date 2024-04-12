@@ -25,6 +25,7 @@ class Mutation:
 
     def __init__(
         self,
+        mutation_length_distribution: str,
         genome: Genome = Genome(1, 1, 1),
     ) -> None:
         """Initializes the attributes of the Mutation class.
@@ -35,6 +36,7 @@ class Mutation:
         self.genome = genome
         self.stats = MutationStatistics()
         self.length = 0
+        self.mutation_length_distribution = mutation_length_distribution
         self.l_m = 10
         self.rng = np.random.default_rng()
 
@@ -125,6 +127,8 @@ class Mutation:
         """
         if "Small" in self.__class__.__name__:
             return rd.randint(1, self.l_m)
+        elif self.mutation_length_distribution == "Geometric":
+            return rd.geometric(1 / self.genome.length)
         return rd.randint(1, self.genome.length)
 
     def _pick_locus_in_neutral_space(
@@ -179,6 +183,7 @@ class PointMutation(Mutation):
 
     def is_neutral(
         self,
+        mutation_length_distribution: str,
     ) -> bool:
         """Checks if the mutation is neutral or not.
 
@@ -208,6 +213,7 @@ class SmallInsertion(Mutation):
     def __init__(
         self,
         l_m,
+        mutation_length_distribution: str,
         genome: Genome = Genome(1, 1, 1),
     ) -> None:
         """Specifies the maximum length of the insertion.
@@ -216,7 +222,7 @@ class SmallInsertion(Mutation):
             l_m (int): maximum length of the insertion.
             genome (Genome, optional): Genome object. Defaults to Genome(1, 1, 1).
         """
-        super().__init__(genome)
+        super().__init__(mutation_length_distribution, genome)
         self.l_m = l_m
 
     def is_neutral(
@@ -275,6 +281,7 @@ class Deletion(Mutation):
 
     def __init__(
         self,
+        mutation_length_distribution: str,
         genome: Genome = Genome(1, 1, 1),
     ) -> None:
         """Initializes the starting locus of the deletion.
@@ -282,7 +289,7 @@ class Deletion(Mutation):
         Args:
             genome (Genome, optional): Genome object. Defaults to Genome(1, 1, 1).
         """
-        super().__init__(genome)
+        super().__init__(mutation_length_distribution, genome)
         self.starting_locus = 0
         self.orientation = 1
 
@@ -382,6 +389,7 @@ class SmallDeletion(Deletion):
     def __init__(
         self,
         l_m,
+        mutation_length_distribution: str,
         genome: Genome = Genome(1, 1, 1),
     ) -> None:
         """Specifies the maximum length of the insertion.
@@ -390,7 +398,7 @@ class SmallDeletion(Deletion):
             l_m (int): maximum length of the insertion.
             genome (Genome, optional): Genome object. Defaults to Genome(1, 1, 1).
         """
-        super().__init__(genome)
+        super().__init__(mutation_length_distribution, genome)
         self.l_m = l_m
 
     def theory(
@@ -417,6 +425,7 @@ class Duplication(Mutation):
 
     def __init__(
         self,
+        mutation_length_distribution: str,
         genome: Genome = Genome(1, 1, 1),
     ) -> None:
         """Initializes the starting locus of the duplication.
@@ -424,7 +433,7 @@ class Duplication(Mutation):
         Args:
             genome (Genome, optional): Genome object. Defaults to Genome(1, 1, 1).
         """
-        super().__init__(genome)
+        super().__init__(mutation_length_distribution, genome)
         self.starting_locus = 0
         self.orientation = 1
 
@@ -557,6 +566,7 @@ class Inversion(Mutation):
 
     def __init__(
         self,
+        mutation_length_distribution: str,
         genome: Genome = Genome(1, 1, 1),
     ) -> None:
         """Initializes the starting locus of the inversion.
@@ -564,7 +574,7 @@ class Inversion(Mutation):
         Args:
             genome (Genome, optional): Genome object. Defaults to Genome(1, 1, 1).
         """
-        super().__init__(genome)
+        super().__init__(mutation_length_distribution, genome)
         self.starting_locus = 0
         self.ending_locus = 0
         self.orientation = 0
@@ -604,49 +614,40 @@ class Inversion(Mutation):
         )
         if self.starting_locus < 0:
             self.starting_locus += self.genome.length
+
         # print(f"\nGenome length: {self.genome.length}")
         if self._bernoulli(1 / 2):
             # deletion is forward
             # print("Forward")
-            endpoint = self.starting_locus + self.length - 1
-            # print(f"Endpoint before check: {endpoint}")
-            if endpoint >= self.genome.length:
-                endpoint -= self.genome.length
+            endpoint = (self.starting_locus + self.length) % self.genome.length
         else:
             # deletion is backward
             # print("Backward")
-            endpoint = self.starting_locus - self.length + 1
-            # print(f"Endpoint before check: {endpoint}")
-            if endpoint < 0:
-                endpoint += self.genome.length
+            endpoint = (self.starting_locus - self.length) % self.genome.length
         # print(f"endpoint: {endpoint}")
         # print(f"loci: {self.genome.loci}")
-        mask_less_than_endpoint = self.genome.loci[self.genome.loci <= endpoint]
-        mask_greater_than_endpoint = self.genome.loci[self.genome.loci > endpoint]
-        if len(mask_less_than_endpoint) == 0:
-            min_endpoint = self.genome.loci[-1] + self.genome.gene_length - 1
-        else:
-            min_endpoint = mask_less_than_endpoint[-1] + self.genome.gene_length - 1
-
-        if len(mask_greater_than_endpoint) == 0:
-            max_endpoint = self.genome.loci[0]
-        else:
-            max_endpoint = mask_greater_than_endpoint[0]
-
-        # print(f"Endpoint: {endpoint}")
-        # print(f"Min endpoint: {min_endpoint}")
-        # print(f"Max endpoint: {max_endpoint}")
-        if min_endpoint < endpoint:
-            # print("Min ok")
-            if max_endpoint > endpoint:
-                # print("Max ok")
-                self.ending_locus = endpoint
-                if self.ending_locus < self.starting_locus:
-                    self.starting_locus, self.ending_locus = (
-                        self.ending_locus,
-                        self.starting_locus,
-                    )
-                return True
+        if endpoint <= self.genome.loci[0]:
+            if self.starting_locus > self.ending_locus:
+                self.starting_locus, self.ending_locus = (
+                    self.ending_locus,
+                    self.starting_locus,
+                )
+            return True
+        if endpoint >= self.genome.loci[-1] + self.genome.gene_length:
+            if self.starting_locus > self.ending_locus:
+                self.starting_locus, self.ending_locus = (
+                    self.ending_locus,
+                    self.starting_locus,
+                )
+            return True
+        previous_coding_loci = self.genome.loci[self.genome.loci < endpoint]
+        if previous_coding_loci[-1] + self.genome.gene_length <= endpoint:
+            if self.starting_locus > self.ending_locus:
+                self.starting_locus, self.ending_locus = (
+                    self.ending_locus,
+                    self.starting_locus,
+                )
+            return True
         return False
 
     def apply(
