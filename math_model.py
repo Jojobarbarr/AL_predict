@@ -19,11 +19,13 @@ def update(
     z_nc,
     mu,
     l_m,
+    variable_Ne,
 ):
     L = z_c + z_nc
     alpha = int(z_nc / g)
     segment_length = int(L / g)
-    N *= R(mu, L, z_nc, g, l_m)
+    if variable_Ne:
+        N *= R(mu, L, z_nc, g, l_m)
     return L, alpha, segment_length, N
 
 
@@ -171,14 +173,22 @@ def tablePfix(g, z_c, z_nc, Ne, mu, l_m, segment_length, alpha):
 
 # On calcul le rapport des tailles moyennes de duplications et délétions fixées:
 # On est à l'équilibre pour le biais 1
-def biais_z_nc(g, z_c, z_nc, N, mu, l_m):
+def biais_z_nc(
+    g,
+    z_c,
+    z_nc,
+    N,
+    mu,
+    l_m,
+    variable_Ne,
+):
     g = Decimal(g)
     z_c = Decimal(z_c)
     z_nc = Decimal(z_nc)
     N = Decimal(N)
     mu = Decimal(mu)
 
-    L, alpha, segment_length, Ne = update(N, g, z_c, z_nc, mu, l_m)
+    L, alpha, segment_length, Ne = update(N, g, z_c, z_nc, mu, l_m, variable_Ne)
     # print(f"Ne: {Ne}")
 
     pre_computed_tablePfix_positive_k, pre_computed_tablePfix_negative_k = tablePfix(
@@ -193,14 +203,14 @@ def biais_z_nc(g, z_c, z_nc, N, mu, l_m):
     return biais_moins / biais_plus
 
 
-def iterate(g, z_c, z_nc, N, mu, l_m, iterations, time_acceleration):
+def iterate(g, z_c, z_nc, N, mu, l_m, iterations, time_acceleration, variable_Ne=True):
     g = Decimal(g)
     z_c = Decimal(z_c)
     z_nc = Decimal(z_nc)
     N = Decimal(N)
     mu = Decimal(mu)
 
-    L, alpha, segment_length, Ne = update(N, g, z_c, z_nc, mu, l_m)
+    L, alpha, segment_length, Ne = update(N, g, z_c, z_nc, mu, l_m, variable_Ne)
     print(f"Initial living proportion: {Ne / N}")
     progress_point = iterations // 20
     nc_proportions = [z_nc / L]
@@ -231,7 +241,7 @@ def iterate(g, z_c, z_nc, N, mu, l_m, iterations, time_acceleration):
             delta = time_acceleration * (bases_inserted - bases_deleted)
 
             z_nc += delta
-            L, alpha, segment_length, Ne = update(N, g, z_c, z_nc, mu, l_m)
+            L, alpha, segment_length, Ne = update(N, g, z_c, z_nc, mu, l_m, variable_Ne)
             nc_proportions.append(z_nc / L)
             Nes.append(Ne)
             if iteration != 0 and iteration % progress_point == 0:
@@ -240,7 +250,7 @@ def iterate(g, z_c, z_nc, N, mu, l_m, iterations, time_acceleration):
                     f"Iteration {iteration}/{iterations} - {checkpoint_time:.2f}s elapsed - Remaining about {(iterations - iteration) * (checkpoint_time / iteration):.2f}s"
                 )
     except KeyboardInterrupt:
-        L, alpha, segment_length, Ne = update(N, g, z_c, z_nc, mu, l_m)
+        L, alpha, segment_length, Ne = update(N, g, z_c, z_nc, mu, l_m, variable_Ne)
     print(f"Iterations: {iteration}")
     print(f"Final non-coding proportion: {z_nc / L} (z_nc = {z_nc})")
     return nc_proportions, Nes
@@ -253,8 +263,12 @@ def funcTargetN(
     N,
     mu,
     l_m,
+    variable_Ne,
 ):
-    result = float(biais_z_nc(g=g, z_c=z_c, z_nc=x, N=N, mu=mu, l_m=l_m) - 1)
+    result = float(
+        biais_z_nc(g=g, z_c=z_c, z_nc=x, N=N, mu=mu, l_m=l_m, variable_Ne=variable_Ne)
+        - 1
+    )
     return result
 
 
@@ -264,10 +278,11 @@ def find_z_nc(
     Ne,
     mu,
     l_m,
+    variable_Ne=True,
 ):
-    max_proportion = 0.99
+    max_proportion = 0.9
     max = max_proportion * z_c / (1 - max_proportion)
-    z_nc = bisect(funcTargetN, 0, int(max), args=(g, z_c, Ne, mu, l_m))
+    z_nc = bisect(funcTargetN, 0, int(max), args=(g, z_c, Ne, mu, l_m, variable_Ne))
     print(f"Final proportion: {z_nc / (z_c + z_nc)} (z_nc = {z_nc})")
 
 
@@ -312,10 +327,14 @@ if __name__ == "__main__":
         alpha = z_nc / g
 
     print(
-        f"Current biais for z_nc = {z_nc}: {biais_z_nc(g=g, z_c=z_c, z_nc=z_nc, N=N, mu=mu, l_m=l_m)}"
+        f"Current biais for z_nc = {z_nc}: {biais_z_nc(g=g, z_c=z_c, z_nc=z_nc, N=N, mu=mu, l_m=l_m, variable_Ne=True)}"
+    )
+    print(
+        f"Current biais for z_nc = {z_nc}: {biais_z_nc(g=g, z_c=z_c, z_nc=z_nc, N=N, mu=mu, l_m=l_m, variable_Ne=False)} (Constant Ne)"
     )
 
-    # find_z_nc(g=g, z_c=z_c, Ne=N, mu=mu, l_m=l_m)
+    # find_z_nc(g=g, z_c=z_c, Ne=N, mu=mu, l_m=l_m, variable_Ne=True)
+    # find_z_nc(g=g, z_c=z_c, Ne=N, mu=mu, l_m=l_m, variable_Ne=False)
 
     print(f"g: {g}, z_c: {z_c}, z_nc: {z_nc}, N: {N}, mu: {mu}, l_m: {l_m}")
     results = iterate(
@@ -334,6 +353,35 @@ if __name__ == "__main__":
     np.save(result_dir / "nc_proportions.npy", nc_proportions)
     Nes = np.array(results[1])
     np.save(result_dir / "Nes.npy", Nes)
+    with open(result_dir / "config.json", "w", encoding="utf8") as json_file:
+        json.dump(
+            {
+                "Iterations": args.iterations,
+                "Time acceleration": args.time_acceleration,
+            },
+            json_file,
+        )
+    plt.plot(nc_proportions)
+    plt.title("Non-coding proportion")
+    plt.xlabel("Iteration")
+    plt.ylabel("Proportion")
+    plt.show()
+    plt.savefig(result_dir / "nc_proportions.png")
+
+    print(f"g: {g}, z_c: {z_c}, z_nc: {z_nc}, N: {N}, mu: {mu}, l_m: {l_m}")
+    results = iterate(
+        g=g,
+        z_c=z_c,
+        z_nc=z_nc,
+        N=N,
+        mu=mu,
+        l_m=l_m,
+        iterations=args.iterations,
+        time_acceleration=args.time_acceleration,
+        variable_Ne=False,
+    )
+    nc_proportions = np.array(results[0])
+    np.save(result_dir / "nc_proportions_constant_Ne.npy", nc_proportions)
     with open(result_dir / "config.json", "w", encoding="utf8") as json_file:
         json.dump(
             {

@@ -76,7 +76,7 @@ def plot_merge_replicas(
     y_value_simulations: npt.NDArray[np.float_],
     y_std_simulations: npt.NDArray[np.float_] | None,
     x_value_iterative_model: npt.NDArray[np.int_],
-    y_value_iterative_model: npt.NDArray[np.float_],
+    y_value_iterative_model: tuple,
     save_path: Path,
     name: str,
 ):
@@ -84,12 +84,23 @@ def plot_merge_replicas(
     plt.clf()
     plt.plot(x_value_simulations, y_value_simulations, marker="o", label="Simulation")
     # plt.errorbar(x_value_simulations, y_value_simulations, y_std_simulations, linestyle="None", marker="o", label="Simulation")
-    plt.plot(
-        x_value_iterative_model,
-        y_value_iterative_model,
-        marker="o",
-        label="Iterative model",
-    )
+    if len(y_value_iterative_model) == 1:
+        plt.plot(
+            x_value_iterative_model,
+            y_value_iterative_model[0],
+            marker="o",
+            label="Iterative model",
+        )
+    else:
+        for iterative_result, label in zip(
+            y_value_iterative_model, ["Iterative  model", "Iterative model constant Ne"]
+        ):
+            plt.plot(
+                x_value_iterative_model,
+                iterative_result,
+                marker="o",
+                label=label,
+            )
     plt.title(f"{name} over generations")
     plt.xlabel("Generation")
     plt.ylabel(f"{name}")

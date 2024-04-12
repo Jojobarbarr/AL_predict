@@ -13,7 +13,7 @@ if __name__ == "__main__":
     for replica in range(nbr_replicas):
         print(f"Replica {replica + 1}")
         with open(
-            f"results/simulation/0_0/{replica + 1}/populations/10000000", "rb"
+            f"results/simulation/0_0_model/{replica + 1}/populations/5000000", "rb"
         ) as pkl_file:
             genomes_loaded = pkl.load(pkl_file)
             genomes[replica * population : population * (replica + 1)] = np.array(

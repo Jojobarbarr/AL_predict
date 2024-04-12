@@ -75,26 +75,40 @@ if __name__ == "__main__":
             livings[replica_index, generation_index:] = np.nan
             min_generation = min(min_generation, generation)
     min_generation = min(min_generation, generations)
-    with open(
-        result_dir / "_iterative_model" / "config.json", "r", encoding="utf8"
-    ) as json_file:
-        config = json.load(json_file)
-        iterations = config["Iterations"]
-        time_acceleration = config["Time acceleration"]
+    try:
+        with open(
+            result_dir / "_iterative_model" / "config.json", "r", encoding="utf8"
+        ) as json_file:
+            config = json.load(json_file)
+            iterations = config["Iterations"]
+            time_acceleration = config["Time acceleration"]
+    except FileNotFoundError:
+        iterations = 0
+        time_acceleration = 0
 
-    x_iterative_model = np.array(
-        [x * time_acceleration for x in range(0, iterations + 1)]
-    )
-    x_iterative_model = x_iterative_model[
-        x_iterative_model - time_acceleration <= min_generation
-    ]
-    nc_proportions_iterative_model = np.load(
-        result_dir / "_iterative_model" / "nc_proportions.npy", allow_pickle=True
-    )[: len(x_iterative_model)]
-    Nes_iterative_model = np.load(
-        result_dir / "_iterative_model" / "Nes.npy", allow_pickle=True
-    )[: len(x_iterative_model)]
-    livings_iterative_model = Nes_iterative_model / population
+    if iterations != 0:
+        x_iterative_model = np.array(
+            [x * time_acceleration for x in range(0, iterations + 1)]
+        )
+        x_iterative_model = x_iterative_model[
+            x_iterative_model - time_acceleration <= min_generation
+        ]
+        nc_proportions_iterative_model = np.load(
+            result_dir / "_iterative_model" / "nc_proportions.npy", allow_pickle=True
+        )[: len(x_iterative_model)]
+        nc_proportions_iterative_model_constant_Ne = np.load(
+            result_dir / "_iterative_model" / "nc_proportions_constant_Ne.npy",
+            allow_pickle=True,
+        )[: len(x_iterative_model)]
+        Nes_iterative_model = np.load(
+            result_dir / "_iterative_model" / "Nes.npy", allow_pickle=True
+        )[: len(x_iterative_model)]
+        livings_iterative_model = Nes_iterative_model / population
+    else:
+        x_iterative_model = np.array([])
+        nc_proportions_iterative_model = np.array([])
+        nc_proportions_iterative_model_constant_Ne = np.array([])
+        livings_iterative_model = np.array([])
 
     save_dir = result_dir / "_plots"
     plot_merge_replicas(
@@ -102,7 +116,7 @@ if __name__ == "__main__":
         non_coding_proportion.mean(axis=0),
         None,
         x_iterative_model,
-        nc_proportions_iterative_model,
+        (nc_proportions_iterative_model, nc_proportions_iterative_model_constant_Ne),
         save_dir,
         "Non coding proportion",
     )
@@ -112,7 +126,7 @@ if __name__ == "__main__":
         livings.mean(axis=0),
         None,
         x_iterative_model,
-        livings_iterative_model,
+        (livings_iterative_model,),
         save_dir,
         "Living children proportion",
     )
