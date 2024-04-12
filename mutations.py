@@ -86,16 +86,12 @@ class Mutation:
     def _pick_segment(
         self,
     ) -> int:
-        try:
-            if self.genome.loci_interval.all() == 0:
-                return False
-            segment = self.rng.choice(
-                len(self.genome.loci_interval),
-                p=self.genome.loci_interval / self.genome.z_nc,
-            )
-        except ValueError:
-            print(self.genome.loci_interval)
-            raise Exception
+        if self.genome.loci_interval.all() == 0:
+            return False
+        segment = self.rng.choice(
+            len(self.genome.loci_interval),
+            p=self.genome.loci_interval / self.genome.z_nc,
+        )
         return segment
 
     def _bernoulli(
@@ -570,6 +566,8 @@ class Inversion(Mutation):
         """
         super().__init__(genome)
         self.starting_locus = 0
+        self.ending_locus = 0
+        self.orientation = 0
 
     def is_neutral(
         self,
@@ -587,13 +585,69 @@ class Inversion(Mutation):
         super().is_neutral()
         if not self._bernoulli((self.genome.z_nc + self.genome.g) / self.genome.length):
             return False
-        try:
-            return self._bernoulli(
-                (self.genome.z_nc + self.genome.g - 1) / (self.genome.length - 1)
+        self.length = self._set_length()
+        segment = int(self._pick_segment())
+        if segment == 0:
+            first_neutral_locus = 0 - (
+                self.genome.length
+                - self.genome.loci[segment - 1]
+                - self.genome.gene_length
             )
-        except ZeroDivisionError:
-            # Genome lentgh is 1
-            return False
+        else:
+            first_neutral_locus = (
+                self.genome.loci[segment - 1] + self.genome.gene_length
+            )
+        last_neutral_locus = self.genome.loci[segment]
+        self.starting_locus = self.rng.integers(
+            first_neutral_locus,
+            last_neutral_locus,
+        )
+        if self.starting_locus < 0:
+            self.starting_locus += self.genome.length
+        # print(f"\nGenome length: {self.genome.length}")
+        if self._bernoulli(1 / 2):
+            # deletion is forward
+            # print("Forward")
+            endpoint = self.starting_locus + self.length - 1
+            # print(f"Endpoint before check: {endpoint}")
+            if endpoint >= self.genome.length:
+                endpoint -= self.genome.length
+        else:
+            # deletion is backward
+            # print("Backward")
+            endpoint = self.starting_locus - self.length + 1
+            # print(f"Endpoint before check: {endpoint}")
+            if endpoint < 0:
+                endpoint += self.genome.length
+        # print(f"endpoint: {endpoint}")
+        # print(f"loci: {self.genome.loci}")
+        mask_less_than_endpoint = self.genome.loci[self.genome.loci <= endpoint]
+        mask_greater_than_endpoint = self.genome.loci[self.genome.loci > endpoint]
+        if len(mask_less_than_endpoint) == 0:
+            min_endpoint = self.genome.loci[-1] + self.genome.gene_length - 1
+        else:
+            min_endpoint = mask_less_than_endpoint[-1] + self.genome.gene_length - 1
+
+        if len(mask_greater_than_endpoint) == 0:
+            max_endpoint = self.genome.loci[0]
+        else:
+            max_endpoint = mask_greater_than_endpoint[0]
+
+        # print(f"Endpoint: {endpoint}")
+        # print(f"Min endpoint: {min_endpoint}")
+        # print(f"Max endpoint: {max_endpoint}")
+        if min_endpoint < endpoint:
+            # print("Min ok")
+            if max_endpoint > endpoint:
+                # print("Max ok")
+                self.ending_locus = endpoint
+                if self.ending_locus < self.starting_locus:
+                    self.starting_locus, self.ending_locus = (
+                        self.ending_locus,
+                        self.starting_locus,
+                    )
+                return True
+        return False
 
     def apply(
         self,
@@ -607,39 +661,8 @@ class Inversion(Mutation):
             virtually (bool, optional): If True, the genome isn't modified. Defaults to False.
         """
         genome_structure_changed = True
-        switched = False
-        breaking_locus = rd.sample(range(0, self.genome.z_nc + self.genome.g), 2)
-        if breaking_locus[1] < breaking_locus[0]:
-            breaking_locus[0], breaking_locus[1] = breaking_locus[1], breaking_locus[0]
-            switched = True
-        next_promoter_locus_index_starting_locus = self._get_next_promoter_index(
-            breaking_locus[0], self.genome.insertion_binary_search
-        )
-        next_promoter_locus_index_ending_point = self._get_next_promoter_index(
-            breaking_locus[1], self.genome.insertion_binary_search
-        )
-        if (
-            next_promoter_locus_index_ending_point
-            == next_promoter_locus_index_starting_locus
-        ):
-            self.length = breaking_locus[1] - breaking_locus[0]
-            genome_structure_changed = False
-
-        else:
-            self.starting_locus = (
-                breaking_locus[0]
-                + (self.genome.gene_length - 1)
-                * next_promoter_locus_index_starting_locus
-            )
-            ending_point = (
-                breaking_locus[1]
-                + (self.genome.gene_length - 1) * next_promoter_locus_index_ending_point
-            )
-            self.length = ending_point - self.starting_locus
-            if not virtually:
-                self.genome.inverse(self.starting_locus, self.length)
-        if switched:
-            self.length = self.genome.length - self.length
+        if not virtually:
+            self.genome.inverse(self.starting_locus, self.length)
         super().apply()
         return genome_structure_changed
 
