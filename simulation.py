@@ -109,12 +109,16 @@ class Simulation(Experiment):
 
         # Mutations
         l_m = int(self.mutations_config["l_m"])
+        try:
+            mutation_length_distribution = self.mutations_config["length_distribution"]
+        except KeyError:
+            mutation_length_distribution = "Uniform"
         self.mutations = np.array(
             [
                 (
-                    MUTATIONS[mutation_type](l_m=l_m, self.mutation_length_distribution)
+                    MUTATIONS[mutation_type](l_m, mutation_length_distribution)
                     if mutation_type in L_M
-                    else MUTATIONS[mutation_type](self.mutation_length_distribution)
+                    else MUTATIONS[mutation_type](mutation_length_distribution)
                 )
                 for mutation_type in mutation_types
             ],

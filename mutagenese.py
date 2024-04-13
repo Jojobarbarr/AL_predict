@@ -88,7 +88,7 @@ class Mutagenese(Experiment):
         if self.variable == "z_c":
             z_c = value
         else:
-            z_c_factor = str_to_int(self.genome_config["z_c_factor"])
+            z_c_factor = str_to_int(self.genome_config["beta"])
             if self.genome_config["z_c_auto"]:
                 z_c = z_c_factor * g
             else:
@@ -97,7 +97,7 @@ class Mutagenese(Experiment):
         if self.variable == "z_nc":
             z_nc = value
         else:
-            z_nc_factor = str_to_int(self.genome_config["z_nc_factor"])
+            z_nc_factor = str_to_int(self.genome_config["alpha"])
             if self.genome_config["z_nc_auto"]:
                 z_nc = z_nc_factor * g
             else:

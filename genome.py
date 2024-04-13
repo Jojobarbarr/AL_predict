@@ -153,16 +153,20 @@ class Genome:
         self.loci[locus_index:] += length
         self.update_features()
 
-    def inverse(self, locus: int, length: int):
-        end_locus = locus + length
+    def inverse(self, locus: int, end_locus: int):
+        # print(f"locus: {locus}, end_locus: {end_locus}")
+        # print(f"loci: {self.loci}")
         locus_affected = np.logical_and(self.loci >= locus, self.loci < end_locus)
-        self.loci[locus_affected] = (locus - 1) + (
-            end_locus - (self.loci[locus_affected][::-1] + self.gene_length - 1)
+        self.loci[locus_affected] = (
+            locus + end_locus - (self.loci[locus_affected][::-1] + self.gene_length - 1)
         )
         self.orientation_list[locus_affected] = -self.orientation_list[locus_affected][
             ::-1
         ]
         self.update_features()
+        # print(f"After inversion:")
+        # print(f"loci: {self.loci}")
+        # print(f"interval: {self.loci_interval}")
 
     def delete(self, locus: int, length: int):
         self.z_nc -= length
