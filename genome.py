@@ -158,7 +158,7 @@ class Genome:
         # print(f"loci: {self.loci}")
         locus_affected = np.logical_and(self.loci >= locus, self.loci < end_locus)
         self.loci[locus_affected] = (
-            locus + end_locus - (self.loci[locus_affected][::-1] + self.gene_length - 1)
+            locus + end_locus - (self.loci[locus_affected][::-1] + self.gene_length)
         )
         self.orientation_list[locus_affected] = -self.orientation_list[locus_affected][
             ::-1

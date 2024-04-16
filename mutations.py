@@ -86,17 +86,6 @@ class Mutation:
             f"Derived class {self.__class__.__name__} of Mutation must implement theory method."
         )
 
-    def _pick_segment(
-        self,
-    ) -> int:
-        if self.genome.loci_interval.all() == 0:
-            return False
-        segment = self.rng.choice(
-            len(self.genome.loci_interval),
-            p=self.genome.loci_interval / self.genome.z_nc,
-        )
-        return segment
-
     def _bernoulli(
         self,
         p: float,
@@ -293,44 +282,64 @@ class Deletion(Mutation):
         self.starting_locus = 0
         self.orientation = 1
 
+    def _pick_segment(
+        self,
+    ) -> int:
+        """Pick the non coding segment on which mutation will happen.
+        Perform a biased draw of the non coding segment with there length.
+
+        Returns:
+            int: the index of the segment.
+        """
+        segment = self.rng.choice(
+            len(self.genome.loci_interval),
+            p=self.genome.loci_interval / self.genome.z_nc,
+        )
+        return segment
+
     def is_neutral(
         self,
     ) -> bool:
         super().is_neutral()
+
         if not self._bernoulli(self.genome.z_nc / self.genome.length):
             return False
+        # starting point is neutral
+
         self.length = self._set_length()
         if not self._length_is_ok():
             return False
-        segment = int(self._pick_segment())
-        # print("\nDeletion")
-        # print(f"length: {self.length}")
-        # print(f"segment: {segment}")
-        # print(f"loci: {self.genome.loci}")
-        # print(f"interval: {self.genome.loci_interval}")
+        # length is less than the maximum non coding length
+
+        segment = self._pick_segment()
         if self.length > self.genome.loci_interval[segment]:
             return False
+        # length is less than the size of the segment picked
+
         if segment == 0:
-            first_neutral_locus = 0 - (
-                self.genome.length
-                - self.genome.loci[segment - 1]
-                - self.genome.gene_length
+            # first neutral locus is at the "end" of the circular genome.
+            # To perform the random draw, first neutral locus will be negative or zero.
+            first_neutral_locus = (
+                -self.genome.length
+                + self.genome.loci[segment - 1]
+                + self.genome.gene_length
             )
+
         else:
             first_neutral_locus = (
                 self.genome.loci[segment - 1] + self.genome.gene_length
             )
+
         last_neutral_locus = self.genome.loci[segment]
-        # print(f"first_neutral_locus: {first_neutral_locus}")
-        # print(f"last_neutral_locus: {last_neutral_locus}")
         self.starting_locus = self.rng.integers(
             first_neutral_locus,
             last_neutral_locus,
         )
-        # print(f"starting_locus: {self.starting_locus}")
-        if self._bernoulli(1 / 2):
+        # last_neutral_locus is excluded
+
+        if rd.random() < 1 / 2:
             # deletion is forward
-            if self.starting_locus + self.length - 1 > last_neutral_locus:
+            if self.starting_locus + self.length - 1 >= last_neutral_locus:
                 return False
             self.orientation = 1
             return True
@@ -350,10 +359,6 @@ class Deletion(Mutation):
         Args:
             virtually (bool, optional): If True, the genome isn't modified. Defaults to False.
         """
-        # print(f"orientation: {self.orientation}")
-        # print(f"length: {self.length}")
-        # print(f"loci: {self.genome.loci}")
-        # print(f"interval: {self.genome.loci_interval}")
         if not virtually:
             if self.starting_locus < 0:
                 self.starting_locus += self.genome.length
@@ -366,8 +371,6 @@ class Deletion(Mutation):
             else:
                 self.genome.delete(self.starting_locus, self.length)
         super().apply()
-        # print(f"loci: {self.genome.loci}")
-        # print(f"interval: {self.genome.loci_interval}")
         return True
 
     def theory(
@@ -382,7 +385,7 @@ class Deletion(Mutation):
             self.genome.z_nc
             * (self.genome.z_nc / self.genome.g + 1)
             / (2 * self.genome.length**2),
-            self.genome.z_nc / (3 * self.genome.g),
+            ((self.genome.z_nc / self.genome.g) + 2) / 3,
         )
 
 
@@ -440,6 +443,23 @@ class Duplication(Mutation):
         self.starting_locus = 0
         self.orientation = 1
 
+    def _pick_segment(
+        self,
+        p: np.ndarray,
+    ) -> int:
+        """Pick the non coding segment on which mutation will happen.
+        Perform a biased draw of the non coding segment.
+
+        Returns:
+            int: _description_
+        """
+
+        segment = self.rng.choice(
+            len(self.genome.loci_interval),
+            p=p / (self.genome.length - self.genome.g),
+        )
+        return segment
+
     def _first_neutral_locus(
         self,
         segment: int,
@@ -456,12 +476,12 @@ class Duplication(Mutation):
         """
         if segment == 0:
             if reverse:
-                return 0 - (
-                    self.genome.length
-                    - self.genome.loci[segment - 1]
-                    - self.genome.gene_length
+                return (
+                    -self.genome.length
+                    + self.genome.loci[segment - 1]
+                    + self.genome.gene_length
                 )
-            return 0 - (self.genome.length - self.genome.loci[segment - 1] - 1)
+            return -self.genome.length + self.genome.loci[segment - 1] + 1
         if reverse:
             return self.genome.loci[segment - 1] + self.genome.gene_length
         return self.genome.loci[segment - 1] + 1
@@ -484,36 +504,57 @@ class Duplication(Mutation):
         super().is_neutral()
         if not self._bernoulli((self.genome.z_nc + self.genome.g) / self.genome.length):
             return False
+        # starting point is neutral
+
         self.length = self._set_length()
         if not self._length_is_ok():
             return False
-        segment = self._pick_segment()
-        corrector = 1
+        # length is less than the maximum non coding length + 2 * (gene_length - 1)
+
+        p = np.array(
+            [
+                self.genome.loci_interval[i]
+                + (self.genome.gene_length - 1)
+                * (
+                    int(self.genome.orientation_list[i] == -1)
+                    + int(self.genome.orientation_list[i - 1] == 1)
+                )
+                for i in range(len(self.genome.loci_interval))
+            ]
+        )
+        # when previous coding section is reversed, the first neutral locus is at the end of the coding section
+        # when previous coding section is forward, the first neutral locus is at the beginning + 1 of the coding section
+        # when current coding section is reversed, the last neutral locus is at the end - 1 of the coding section
+        # when current coding section is forward, the last neutral locus is at the beginning of the coding section
+        segment = self._pick_segment(p)
+
+        neutral_length = p[segment]
+        if self.length > neutral_length:
+            return False
+        # length is less than the size of the segment picked
+
         first_neutral_reverse = False
         last_neutral_reverse = False
         if self.genome.orientation_list[segment - 1] == -1:
-            corrector -= 1
             first_neutral_reverse = True
         if self.genome.orientation_list[segment] == -1:
-            corrector += 1
             last_neutral_reverse = True
-        neutral_length = self.genome.loci_interval[segment] + corrector * (
-            self.genome.gene_length - 1
-        )
-        if self.length > neutral_length:
-            return False
+
         first_neutral_locus = self._first_neutral_locus(segment, first_neutral_reverse)
-        if last_neutral_reverse:
-            last_neutral_locus = self.genome.loci[segment] + self.genome.gene_length - 1
+
         last_neutral_locus = self.genome.loci[segment]
+        if last_neutral_reverse:
+            last_neutral_locus += self.genome.gene_length - 1
 
         self.starting_locus = self.rng.integers(
             first_neutral_locus,
             last_neutral_locus,
         )
+        # last_neutral_locus is excluded
+
         if self._bernoulli(1 / 2):
             # duplication is forward
-            if self.starting_locus + self.length - 1 > last_neutral_locus:
+            if self.starting_locus + self.length - 1 >= last_neutral_locus:
                 return False
             self.orientation = 1
             return True
@@ -560,7 +601,7 @@ class Duplication(Mutation):
                 * ((self.genome.z_c + self.genome.z_nc) / self.genome.g - 1)
             )
             / (2 * self.genome.length**2),
-            (self.genome.z_c + self.genome.z_nc) / (3 * self.genome.g),
+            (self.genome.z_c + self.genome.z_nc + self.genome.g) / (3 * self.genome.g),
         )
 
 
@@ -580,7 +621,15 @@ class Inversion(Mutation):
         super().__init__(mutation_length_distribution, genome)
         self.starting_locus = 0
         self.ending_locus = 0
-        self.orientation = 0
+
+    def _pick_segment(
+        self,
+    ) -> int:
+        segment = self.rng.choice(
+            len(self.genome.loci_interval),
+            p=(self.genome.loci_interval + 1) / (self.genome.z_nc + self.genome.g),
+        )
+        return segment
 
     def is_neutral(
         self,
@@ -599,7 +648,7 @@ class Inversion(Mutation):
         if not self._bernoulli((self.genome.z_nc + self.genome.g) / self.genome.length):
             return False
         self.length = self._set_length()
-        segment = int(self._pick_segment())
+        segment = self._pick_segment()
         if segment == 0:
             first_neutral_locus = 0 - (
                 self.genome.length
@@ -610,38 +659,23 @@ class Inversion(Mutation):
             first_neutral_locus = (
                 self.genome.loci[segment - 1] + self.genome.gene_length
             )
-        # print(f"\nsegment: {segment}")
-        # print(f"loci: {self.genome.loci}")
-        # print(f"interval: {self.genome.loci_interval}")
         last_neutral_locus = self.genome.loci[segment]
-        self.starting_locus = self.rng.integers(
-            first_neutral_locus,
-            last_neutral_locus,
-        )
-        # print(f"starting_locus: {self.starting_locus}")
+        if first_neutral_locus == last_neutral_locus:
+            self.starting_locus = first_neutral_locus
+        else:
+            self.starting_locus = self.rng.integers(
+                first_neutral_locus,
+                last_neutral_locus,
+            )
         if self.starting_locus < 0:
             self.starting_locus += self.genome.length
-        # print(f"starting_locus: {self.starting_locus}")
-        # print(f"\nGenome length: {self.genome.length}")
         if self._bernoulli(1 / 2):
             # deletion is forward
-            # print("Forward")
             self.ending_locus = (self.starting_locus + self.length) % self.genome.length
         else:
             # deletion is backward
-            # print("Backward")
             self.ending_locus = (self.starting_locus - self.length) % self.genome.length
-        # print(f"length: {self.length}")
-        # print(f"endpoint: {self.ending_locus}")
-        # print(f"loci: {self.genome.loci}")
         if self.ending_locus <= self.genome.loci[0]:
-            if self.starting_locus > self.ending_locus:
-                self.starting_locus, self.ending_locus = (
-                    self.ending_locus,
-                    self.starting_locus,
-                )
-            return True
-        if self.ending_locus >= self.genome.loci[-1] + self.genome.gene_length:
             if self.starting_locus > self.ending_locus:
                 self.starting_locus, self.ending_locus = (
                     self.ending_locus,
@@ -656,7 +690,6 @@ class Inversion(Mutation):
                     self.starting_locus,
                 )
             return True
-        # print("Not neutral")
         return False
 
     def apply(
@@ -671,11 +704,6 @@ class Inversion(Mutation):
             virtually (bool, optional): If True, the genome isn't modified. Defaults to False.
         """
         genome_structure_changed = True
-        # print(f"starting_locus: {self.starting_locus}")
-        # print(f"ending_locus: {self.ending_locus}")
-        # print(f"length: {self.length}")
-        # print(f"loci: {self.genome.loci}")
-        # print(f"interval: {self.genome.loci_interval}")
         if not virtually:
             self.genome.inverse(self.starting_locus, self.ending_locus)
         super().apply()

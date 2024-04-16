@@ -111,6 +111,12 @@ if __name__ == "__main__":
         livings_iterative_model = np.array([])
 
     save_dir = result_dir / "_plots"
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    np.save(save_dir / "x_values.npy", x_values)
+    np.save(save_dir / "non_coding_proportion.npy", non_coding_proportion.mean(axis=0))
+    np.save(save_dir / "livings.npy", livings.mean(axis=0))
+
     plot_merge_replicas(
         x_values,
         non_coding_proportion.mean(axis=0),

@@ -26,7 +26,7 @@ class TestMutation(unittest.TestCase):
         self.genome.orientation_list = np.array(
             [1, 1, -1, -1, 1, -1, -1, 1, 1, -1], dtype=np.int_
         )
-        self.mutation = Mutation()
+        self.mutation = Mutation("Uniform")
         self.mutation.genome = self.genome
 
     def test_str(self):
@@ -59,7 +59,7 @@ class TestPointMutation(unittest.TestCase):
         self.genome.orientation_list = np.array(
             [1, 1, -1, -1, 1, -1, -1, 1, 1, -1], dtype=np.int_
         )
-        self.mutation = PointMutation()
+        self.mutation = PointMutation("Uniform")
         self.mutation.genome = self.genome
 
     def test_str(self):
@@ -73,7 +73,7 @@ class TestSmallInsertion(unittest.TestCase):
         self.genome.orientation_list = np.array(
             [1, 1, -1, -1, 1, -1, -1, 1, 1, -1], dtype=np.int_
         )
-        self.mutation = SmallInsertion(l_m=10)
+        self.mutation = SmallInsertion(l_m=10, mutation_length_distribution="Uniform")
         self.mutation.genome = self.genome
 
     def test_str(self):
@@ -102,7 +102,7 @@ class TestDeletion(unittest.TestCase):
         self.genome.orientation_list = np.array(
             [1, 1, -1, -1, 1, -1, -1, 1, 1, -1], dtype=np.int_
         )
-        self.mutation = Deletion()
+        self.mutation = Deletion("Uniform")
         self.mutation.genome = self.genome
 
     def test_str(self):
@@ -138,7 +138,7 @@ class TestSmallDeletion(unittest.TestCase):
         self.genome.orientation_list = np.array(
             [1, 1, -1, -1, 1, -1, -1, 1, 1, -1], dtype=np.int_
         )
-        self.mutation = SmallDeletion(l_m=10)
+        self.mutation = SmallDeletion(l_m=10, mutation_length_distribution="Uniform")
         self.mutation.genome = self.genome
 
     def test_str(self):
@@ -152,7 +152,7 @@ class TestDuplication(unittest.TestCase):
         self.genome.orientation_list = np.array(
             [1, 1, -1, -1, 1, -1, -1, 1, 1, -1], dtype=np.int_
         )
-        self.mutation = Duplication()
+        self.mutation = Duplication("Uniform")
         self.mutation.genome = self.genome
 
     def test_str(self):
@@ -182,7 +182,7 @@ class TestInversion(unittest.TestCase):
         self.genome.orientation_list = np.array(
             [1, 1, -1, -1, 1, -1, -1, 1, 1, -1], dtype=np.int_
         )
-        self.mutation = Inversion()
+        self.mutation = Inversion("Uniform")
         self.mutation.genome = self.genome
 
     def test_str(self):
