@@ -93,7 +93,7 @@ def plot_merge_replicas(
         )
     else:
         for iterative_result, label in zip(
-            y_value_iterative_model, ["Iterative  model", "Iterative model constant Ne"]
+            y_value_iterative_model, ["Iterative model", "Iterative model constant Ne"]
         ):
             plt.plot(
                 x_value_iterative_model,

@@ -1,7 +1,6 @@
 import json
 import pickle as pkl
 from collections import Counter
-from math_model import R
 from time import perf_counter
 from multiprocessing import Process
 import traceback

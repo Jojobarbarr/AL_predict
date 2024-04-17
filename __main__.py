@@ -1,12 +1,10 @@
 import argparse
-
 import json
 from pathlib import Path
+
 import matplotlib.pyplot as plt
 
-
 from mutagenese import Mutagenese
-from simulation import Simulation
 from wright_fisher import WrightFisher
 
 if __name__ == "__main__":
@@ -16,7 +14,7 @@ if __name__ == "__main__":
 
     arg_parser = argparse.ArgumentParser(
         prog="AL_predict",
-        description="Evolution model from a math model over genome structure.",
+        description="Evolution model from a math model about genome structure.",
     )
 
     arg_parser.add_argument(
@@ -78,8 +76,14 @@ if __name__ == "__main__":
         experiment = Mutagenese(config, args)
 
     elif config["Experiment"]["Type"] == "Simulation":
+
         if config["Simulation"]["Replication model"] == "Wright-Fisher":
             experiment = WrightFisher(config, args)
+        elif config["Simulation"]["Replication model"] == "Moran":
+            raise NotImplementedError(
+                "Moran model is not implemented. Maybe you can do it ;-) ?"
+            )
+
         if args.save:
             experiment.save_population("initial_population.pkl")
 
