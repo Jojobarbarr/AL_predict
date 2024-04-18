@@ -4,10 +4,12 @@ import numpy as np
 
 from stats import GenomeStatistics
 
-COUNTER = 0
-
 
 class Genome:
+    """Genome class.
+    Contains all the method to manipulate the genome.
+    """
+
     def __init__(
         self,
         g: int,
@@ -15,10 +17,16 @@ class Genome:
         z_nc: int,
         homogeneous: bool = False,
         orientation: bool = False,
-    ):
-        global COUNTER
-        COUNTER += 1
-        self.counter = COUNTER
+    ) -> None:
+        """Genome constructor.
+
+        Args:
+            g (int): Number of segments (one segment is one non coding segment + one coding segment) in the genome.
+            z_c (int): Number of coding bases in the genome.
+            z_nc (int): Number of non coding bases in the genome.
+            homogeneous (bool, optional): If True, the genome is homogeneous: every non coding segments are the same size (+/- 1). Defaults to False.
+            orientation (bool, optional): If True, all genes are in the same direction. Defaults to False.
+        """
         if g == 1 and z_c == 1 and z_nc == 1:
             # Dummy genome, no calculation will be done on it.
             return None
@@ -50,23 +58,39 @@ class Genome:
             f"gene_length: {self.gene_length}\n"
         )
 
-    def clone(self):
+    def clone(self) -> "Genome":
+        """Deep clone of the genome.
+
+        Returns:
+            Genome: The clone of the self genome
+        """
         genome = Genome(1, 1, 1)
+
         genome.z_c = self.z_c
         genome.z_nc = self.z_nc
         genome.length = self.length
+
         genome.g = self.g
+
         genome.homogeneous = self.homogeneous
         genome.orientation = self.orientation
+
         genome.gene_length = self.gene_length
         genome.max_length_neutral = self.max_length_neutral
+
         genome.stats = self.stats.clone()
+
         genome.loci = self.loci.copy()
         genome.orientation_list = self.orientation_list.copy()
         genome.loci_interval = self.loci_interval.copy()
         return genome
 
-    def init_genome(self):
+    def init_genome(self) -> tuple[np.ndarray, np.ndarray]:
+        """Initialize the genome structure
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: (loci of the first base of genes, orientation of genes)
+        """
         if self.orientation:
             orientation = np.array([1 for _ in range(self.g)], dtype=np.int_)
         else:
@@ -96,6 +120,7 @@ class Genome:
         return loci, orientation
 
     def compute_intervals(self):
+        """Computes the number of non coding bases between the genes."""
         self.loci_interval = np.array(
             [
                 self.loci[i] - self.loci[i - 1] - self.gene_length
@@ -106,43 +131,33 @@ class Genome:
         self.loci_interval[0] = (
             self.length + self.loci[0] - self.loci[-1] - self.gene_length
         )
-        if self.loci_interval[self.loci_interval < 0].any():
-            print(self.loci)
-            print(self.loci_interval)
-            print(traceback.print_stack())
-            raise ValueError("Negative interval detected.")
+        # if self.loci_interval[self.loci_interval < 0].any():
+        #     print(self.loci)
+        #     print(self.loci_interval)
+        #     print(traceback.print_stack())
+        #     raise ValueError("Negative interval detected.")
 
-    def insertion_binary_search(self, target: int) -> int:
+    def insertion_binary_search(
+        self,
+        target: int,
+    ) -> int:
+        """_summary_
+
+        Args:
+            target (int): _description_
+
+        Raises:
+            ValueError: _description_
+
+        Returns:
+            int: _description_
+        """
         if target < 0 or target > self.z_nc + self.g:
             raise ValueError("Target is out of the neutral space.")
         left, right = 0, len(self.loci) - 1
         while left <= right:
             middle = (left + right) // 2
             if self.loci[middle] < target + middle * (self.gene_length - 1):
-                left = middle + 1
-            else:
-                right = middle - 1
-        return left
-
-    def deletion_binary_search(self, target: int) -> int:
-        if target < 0 or target > self.z_nc:
-            raise ValueError("Target is out of the neutral space.")
-        left, right = 0, len(self.loci) - 1
-        while left <= right:
-            middle = (left + right) // 2
-            if self.loci[middle] <= target + middle * self.gene_length:
-                left = middle + 1
-            else:
-                right = middle - 1
-        return left
-
-    def duplication_binary_search(self, target: int) -> int:
-        if target < 0 or target > self.length - self.g:
-            raise ValueError("Target is out of the neutral space.")
-        left, right = 0, len(self.loci) - 1
-        while left <= right:
-            middle = (left + right) // 2
-            if self.loci[middle] <= target + middle:
                 left = middle + 1
             else:
                 right = middle - 1

@@ -1,6 +1,6 @@
 import json
 from argparse import ArgumentParser
-from decimal import Decimal, getcontext
+from decimal import Decimal, getcontext, InvalidOperation, DivisionByZero
 from pathlib import Path
 from time import perf_counter
 
@@ -574,6 +574,11 @@ def iterate(
         )
         l, alpha, segment_length, n_e = update(
             n, g, z_c, z_nc, mu, Decimal(l_m), variable_n_e
+        )
+    except (InvalidOperation, DivisionByZero) as err:
+        print(
+            "Error during computation, exiting the loop but continuing execution."
+            f"Error: {err}"
         )
 
     print(f"Iterations: {iteration}")

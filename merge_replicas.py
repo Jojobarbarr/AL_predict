@@ -96,6 +96,9 @@ if __name__ == "__main__":
         nc_proportions_iterative_model = np.load(
             result_dir / "_iterative_model" / "nc_proportions.npy", allow_pickle=True
         )[: len(x_iterative_model)]
+        nc_proportions_iterative_model[1:][
+            nc_proportions_iterative_model[1:] == 0
+        ] = np.nan
         nc_proportions_iterative_model_constant_Ne = np.load(
             result_dir / "_iterative_model" / "nc_proportions_constant_Ne.npy",
             allow_pickle=True,
