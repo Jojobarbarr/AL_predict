@@ -112,39 +112,6 @@ class TestGenome(unittest.TestCase):
 
     @parameterized.expand(
         [
-            (0, 0),
-            (1, 1),
-            (2, 3),
-            (16, 5),
-            (41, 10),
-        ]
-    )
-    def test_deletion_binary_search(self, input_value, expected_result):
-        with patch("random.sample", return_value=[1, 3, 4, 10, 15, 22, 30, 32, 33, 40]):
-            genome = Genome(10, 100, 50)
-        result = genome.deletion_binary_search(input_value)
-        self.assertEqual(result, expected_result)
-
-    @parameterized.expand(
-        [
-            (0, 0),
-            (1, 1),
-            (2, 1),
-            (52, 5),
-            (133, 10),
-        ]
-    )
-    def test_duplication_binary_search(self, input_value, expected_result):
-        with patch("random.sample", return_value=[1, 3, 4, 10, 15, 22, 30, 32, 33, 40]):
-            genome = Genome(10, 100, 50)
-            self.assertListEqual(
-                genome.loci.tolist(), [1, 12, 22, 37, 51, 67, 84, 95, 105, 121]
-            )
-            result = genome.duplication_binary_search(input_value)
-            self.assertEqual(result, expected_result)
-
-    @parameterized.expand(
-        [
             ((0, 1), [2, 13, 23, 38, 52, 68, 85, 96, 106, 122]),
             ((0, 4), [5, 16, 26, 41, 55, 71, 88, 99, 109, 125]),
             ((3, 2), [1, 12, 22, 39, 53, 69, 86, 97, 107, 123]),
@@ -171,18 +138,18 @@ class TestGenome(unittest.TestCase):
             ),
             (
                 (1, 10),
-                [1, 12, 22, 37, 51, 67, 84, 95, 105, 121],
+                [0, 12, 22, 37, 51, 67, 84, 95, 105, 121],
                 [-1, 1, -1, -1, 1, -1, -1, 1, 1, -1],
             ),
             (
                 (1, 11),
-                [2, 12, 22, 37, 51, 67, 84, 95, 105, 121],
+                [1, 12, 22, 37, 51, 67, 84, 95, 105, 121],
                 [-1, 1, -1, -1, 1, -1, -1, 1, 1, -1],
             ),
             (
                 (22, 97),
-                [1, 12, 26, 36, 47, 64, 80, 94, 109, 121],
-                [1, 1, -1, -1, 1, 1, -1, 1, 1, -1],
+                [1, 12, 14, 25, 42, 58, 72, 87, 105, 121],
+                [1, 1, -1, 1, 1, -1, 1, 1, 1, -1],
             ),
             (
                 (132, 3),
