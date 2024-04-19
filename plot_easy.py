@@ -3,9 +3,12 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import json
 
+
+folder_name = "-2_2"
+
 folders = (
-    Path("results/simulation/0_0/_plots"),
-    Path("results/simulation/0_0_model/_plots"),
+    Path(f"results/simulation/{folder_name}/_plots"),
+    Path(f"results/simulation/{folder_name}_model/_plots"),
     # Path("results/simulation/0_0_from_top/_plots"),
 )
 labels = (
@@ -19,11 +22,11 @@ colors = (
     "tomato",
 )
 
-population = 1024
-iterative_model_folder = Path("results/simulation/0_0/_iterative_model")
+population = 256
+iterative_model_folder = Path(f"results/simulation/{folder_name}/_iterative_model")
 
-name = "0_0"
-figure_dir = Path(f"results/figures/{name}")
+
+figure_dir = Path(f"results/figures/{folder_name}")
 figure_dir.mkdir(parents=True, exist_ok=True)
 
 if __name__ == "__main__":
@@ -35,8 +38,8 @@ if __name__ == "__main__":
         nc_proportions.append(np.load(folder / "non_coding_proportion.npy"))
         livings.append(np.load(folder / "livings.npy"))
 
-    max_index = min(
-        [len(x_values[folder_index]) for folder_index in range(len(folders))]
+    max_index = (
+        min([len(x_values[folder_index]) for folder_index in range(len(folders))]) - 1
     )
     min_generation = x_values[0][max_index]
 
@@ -56,6 +59,7 @@ if __name__ == "__main__":
     nc_proportions_iterative_model = np.load(
         iterative_model_folder / "nc_proportions.npy", allow_pickle=True
     )[: len(x_iterative_model)]
+    nc_proportions_iterative_model[1:][nc_proportions_iterative_model[1:] == 0] = np.nan
     nc_proportions_iterative_model_constant_Ne = np.load(
         iterative_model_folder / "nc_proportions_constant_Ne.npy",
         allow_pickle=True,
