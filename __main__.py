@@ -58,7 +58,7 @@ if __name__ == "__main__":
         "--checkpoint",
         type=Path,
         default=".",
-        help="If used, the simulation will be loaded from a checkpoint and saved in the first replica folder, unless a replica is specified with the -r option.",
+        help="If used, the simulation will be loaded from a checkpoint.",
     )
     arg_parser.add_argument(
         "-v",

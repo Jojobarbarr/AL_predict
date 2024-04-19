@@ -624,6 +624,44 @@ def bisect_target(
     return result
 
 
+def bisect_target_n_e(
+    x: float,
+    g: Decimal,
+    z_c: Decimal,
+    z_nc: Decimal,
+    mu: Decimal,
+    l_m: int,
+    variable_n_e: bool,
+) -> float:
+    """Function to bisect to find the equilibrium between the number of non-coding bases
+
+    Args:
+        x (float): Number of non-coding bases
+        g (Decimal): Number of segments
+        z_c (Decimal): Number of coding bases
+        n (Decimal): Population size
+        mu (Decimal): Mutation rate
+        l_m (int): Maximum size of Indels
+        variable_n_e (bool): If True, the effective population size will be updated.
+
+    Returns:
+        float: The difference between the current bias and 1 (equilibrium)
+    """
+    result = float(
+        biais_z_nc(
+            g=g,
+            z_c=z_c,
+            z_nc=z_nc,
+            n=Decimal(x),
+            mu=mu,
+            l_m=l_m,
+            variable_n_e=variable_n_e,
+        )
+        - 1
+    )
+    return result
+
+
 def find_z_nc(
     g: Decimal,
     z_c: Decimal,
@@ -656,6 +694,37 @@ def find_z_nc(
     )
     assert isinstance(z_nc, float)
     print(f"Final proportion: {Decimal(z_nc) / (z_c + Decimal(z_nc))} (z_nc = {z_nc})")
+
+
+def find_n_e(
+    g: Decimal,
+    z_c: Decimal,
+    z_nc: Decimal,
+    mu: Decimal,
+    l_m: int,
+    variable_n_e=True,
+) -> None:
+    """Perform a bisection to find the equilibrium between the number of non-coding bases
+    and the number of coding bases
+
+    Args:
+        g (Decimal): Number of segments
+        z_c (Decimal): Number of coding bases
+        n_e (Decimal): Population effective size
+        mu (Decimal): Mutation rate
+        l_m (int): Maximum size of Indels
+        variable_n_e (bool, optional): If True, population effective size is variable.
+        Defaults to True.
+    """
+    up_start: Decimal = Decimal(100)
+    n_e = bisect(
+        bisect_target_n_e,
+        0,
+        int(up_start),
+        args=(g, z_c, z_nc, mu, l_m, variable_n_e),
+    )
+    assert isinstance(n_e, float)
+    print(f"Final Ne: {n_e})")
 
 
 if __name__ == "__main__":

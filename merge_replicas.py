@@ -11,20 +11,17 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("config", type=Path, help="Path to the config file")
     parser.add_argument(
-        "-i", "--skip_incomplete", action="store_true", help="Skip incomplete replicas"
-    )
-    parser.add_argument(
-        "-p",
-        "--precise",
-        action="store_true",
-        help="Print the mean of the last (1-MEAN_MASK) generations",
-    )
-    parser.add_argument(
         "-m",
         "--mean_mask",
         type=float,
         default=0.75,
-        help="Proportion of generations to compute the mean on",
+        help="The last (1-mean_mask) percentage of generations will be used to compute the mean",
+    )
+    parser.add_argument(
+        "-d",
+        "--disable",
+        action="store_true",
+        help="If True, the non constant N_e model will not be plotted",
     )
     args = parser.parse_args()
 
@@ -96,9 +93,12 @@ if __name__ == "__main__":
         nc_proportions_iterative_model = np.load(
             result_dir / "_iterative_model" / "nc_proportions.npy", allow_pickle=True
         )[: len(x_iterative_model)]
-        nc_proportions_iterative_model[1:][
-            nc_proportions_iterative_model[1:] == 0
-        ] = np.nan
+        if args.disable:
+            nc_proportions_iterative_model[:] = np.nan
+        else:
+            nc_proportions_iterative_model[1:][
+                nc_proportions_iterative_model[1:] == 0
+            ] = np.nan
         nc_proportions_iterative_model_constant_Ne = np.load(
             result_dir / "_iterative_model" / "nc_proportions_constant_Ne.npy",
             allow_pickle=True,
